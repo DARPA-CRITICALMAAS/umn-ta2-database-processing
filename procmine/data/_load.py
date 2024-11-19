@@ -49,4 +49,6 @@ def load_data(path_file):
         
         return pl.from_pandas(pd_data)
     
-    return 0
+    if not filename_extension:
+        # CASE directory
+        pass
