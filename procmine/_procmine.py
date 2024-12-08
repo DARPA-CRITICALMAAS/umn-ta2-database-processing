@@ -34,9 +34,15 @@ class ProcMine:
             logger.set_level('WARNING')
 
     def process(self):
-        # Load data and map file
+        # Loading data
         self.load_data()
         self.load_map()
+
+        # Load_entity
+
+        # Converting to map dictionary
+        converting.non2dict(pl_data=self.map,
+                            key_col='key')
         
         # # Save processed output
         # self.save_output()
@@ -95,9 +101,9 @@ class ProcMine:
         self.path_output = os.path.join(path_output_dir, path_output_file)
 
         try:
-            data.save_data(data, path_save=self.path_output, save_format=save_format)
+            data.save_data(self.data, path_save=self.path_output, save_format=save_format)
 
         except:
             # TODO: Test if enters here when unsupported save format is given
             logger.warning("Unacceptable save format. Defaulting to pickle.")
-            data.save_data(data, path_save=self.path_output, save_format='pickle')
+            data.save_data(self.data, path_save=self.path_output, save_format='pickle')
