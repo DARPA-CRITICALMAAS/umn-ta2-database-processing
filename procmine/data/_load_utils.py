@@ -8,33 +8,45 @@ import geopandas as gpd
 
 from shapely import wkt
 
-def check_file_path(path_file): 
-    if os.path.isfile(path_file):
+def check_mode(path_file: str) -> str:
+    _, file_extension = os.path.splitext(path_file)
+
+    if file_extension:
+        return file_extension
+    
+    return 'dir'
+
+def check_exist(path_file):
+    if os.path.exists(path_file):
         return 1
     
-    return 0
+    return -1
 
-def load_data(path_file):
-    _, filename_extension = os.path.splitext(path_file)
+def load_data(path_file, mode_data):
+    _, mode_data = os.path.splitext(path_file)
 
-    if filename_extension == '.csv':
-        return pl.read_csv(path_file)
+    if mode_data == '.csv':
+        return pl.read_csv(path_file, encoding='utf8-lossy')
     
-    if filename_extension == '.json':
+    if mode_data == '.tsv' or mode_data == '.txt':
+        # TODO: Check if this is correct
+        return pl.read_csv(path_file, separator='\t', encoding='utf8-lossy')
+    
+    if mode_data == '.json':
         return pl.read_json(path_file)
     
-    if filename_extension in ['.xls', '.xlsx']:
+    if mode_data in ['.xls', '.xlsx']:
         return pl.read_excel(path_file)
     
-    if filename_extension == '.pkl':
+    if mode_data == '.pkl':
         with open(path_file, 'rb') as handle:
             return pickle.load(handle)
         
-    if filename_extension in ['.gdb', '.geojson', '.shp']:
+    if mode_data in ['.gdb', '.geojson', '.shp']:
         # Setting driver for geo-dataframes
-        if filename_extension == '.gdb':
+        if mode_data == '.gdb':
             driver = 'OpenFileGDB'
-        elif filename_extension == 'geojson':
+        elif mode_data == 'geojson':
             driver = 'GeoJSON'
 
         # Converting longitude, latitude, crs into value
@@ -49,6 +61,7 @@ def load_data(path_file):
         
         return pl.from_pandas(pd_data)
     
-    if not filename_extension:
-        # CASE directory
+    if not mode_data:
+        # CASE directory 
+        print('hello')
         pass
