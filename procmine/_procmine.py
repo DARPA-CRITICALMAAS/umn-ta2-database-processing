@@ -9,7 +9,8 @@ from procmine import data
 from procmine import converting
 
 from procmine._utils import (
-    DefaultLogger
+    DefaultLogger,
+    compile_entities,
 )
 
 logger = DefaultLogger()
@@ -21,12 +22,14 @@ class ProcMine:
                  path_map: str=None,
                  dir_output:str=None,
                  file_output:str=None,
+                 dir_entities:str='./procmine/_entities',
                  verbose: bool=False) -> None:
         
         self.path_data = path_data
         self.path_map = path_map
         self.dir_output = dir_output
         self.file_output = file_output
+        self.dir_entities = dir_entities
 
         if verbose:
             logger.set_level('DEBUG')
@@ -38,12 +41,21 @@ class ProcMine:
         self.load_data()
         self.load_map()
 
-        # Load_entity
-
         # Converting to map dictionary
         converting.non2dict(pl_data=self.map,
                             key_col='key')
         
+        # Load_entity as dataframe
+        self.entities, minmod_entities = compile_entities(self.dir_entities)
+        logger.info(f"Entities dictionary has been created based on those available as CSV in {self.dir_entities}")
+
+        existing_entities = list(set(self.data.columns) & set(minmod_entities))
+        for entity_type in existing_entities:
+            # TODO: feed entity type and filter out the self.entities in the dictionary format
+            # TODO: map elements of the dataframe
+            
+            pass
+
         # # Save processed output
         # self.save_output()
 
@@ -75,7 +87,7 @@ class ProcMine:
             raise ValueError("Attribute map cannot be a directory.",
                              "Please input a single attribute map.")
         
-        self.map = data.load_data(path_file, mode_map)
+        self.map = data.load_data(path_file, mode_map).drop_nulls(subset=['corresponding_attribute_label'])
 
     def save_output(self,
                     save_format: str='json') -> None:
@@ -89,7 +101,8 @@ class ProcMine:
             data.check_directory_pathcheck(path_directory=path_output_dir)
         
         if not path_output_file:
-            file_name, _ = os.path.splitext(os.path.basename(self.path_data))
+            file_name = data.return_basename(self.path_data)
+            # file_name, _ = os.path.splitext(os.path.basename(self.path_data))
 
             logger.info(f"Saving as default file:{file_name}output.json")
             path_output_file = file_name

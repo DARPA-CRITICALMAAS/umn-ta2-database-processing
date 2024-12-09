@@ -2,7 +2,8 @@ from typing import Dict, List
 
 import strsim
 
-def entity2id(entity_name: str,) -> Dict[float, str, str, str]:
+def entity2id(entity_name: str,
+              entity_type: str,) -> Dict[float, str, str, str]:
     """
     Converts string type of entity to that maps to minmod ID
 
@@ -24,6 +25,28 @@ def entity2id(entity_name: str,) -> Dict[float, str, str, str]:
     return dict_entity
 
 def identify_entity_id(entity_name: str) -> List[str, float]:
-    # Exact match takes priority
+    """
+    Compares the entity name to that in the entities dictionary
+    Returns the corresponding minmod id and the confidence score of the decision
 
-    pass
+    Arguments
+    : entity_name:
+
+    Return
+    """
+    try:
+        # Exact match takes priority
+        normalized_uri = 'Q'
+        confidence = float(1.0) 
+
+    except:
+        # Run fuzzy matching
+        normalized_uri = 'Q'
+        confidence = float(0.0)
+
+    if confidence < 0.4:
+        # Confidence is too low to be linked to something
+        # Report only the observed name
+        return None, None
+
+    return normalized_uri, confidence

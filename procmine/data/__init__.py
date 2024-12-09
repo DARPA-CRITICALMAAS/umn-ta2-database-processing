@@ -8,4 +8,5 @@ __all__ = [
     "check_directory_path",
     "check_mode",
     "check_exists",
+    "return_basename",
 ]

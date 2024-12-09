@@ -1,5 +1,6 @@
 from typing import Dict
 import polars as pl
+import pyspark
 
 def label2label(pl_data: pl.DataFrame,
                 dict_label_map: Dict[str, str]) -> pl.DataFrame:
