@@ -42,19 +42,18 @@ class ProcMine:
         self.load_map()
 
         # Converting to map dictionary
-        converting.non2dict(pl_data=self.map,
-                            key_col='key')
+        self.map = converting.non2dict(pl_data=self.map,
+                                       key_col='key')
         
         # Load_entity as dataframe
         self.entities, minmod_entities = compile_entities(self.dir_entities)
         logger.info(f"Entities dictionary has been created based on those available as CSV in {self.dir_entities}")
 
-        existing_entities = list(set(self.data.columns) & set(minmod_entities))
-        for entity_type in existing_entities:
-            # TODO: feed entity type and filter out the self.entities in the dictionary format
-            # TODO: map elements of the dataframe
-            
-            pass
+        # Map labels based on mapping dictionary
+        self.data = converting.label2label(pl_data=self.data, dict_label_map=self.map)
+
+        # Convert to schema format
+        self.data = converting.data2schema(pl_data=self.data, pl_entities=self.entities)
 
         # # Save processed output
         # self.save_output()

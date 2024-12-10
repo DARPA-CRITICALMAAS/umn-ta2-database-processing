@@ -6,8 +6,7 @@ __all__ = [
     "crs2crs",
     "crs2epsg",
     "check_crs_range",
-    "entity2id",
     "id2entity",
     "label2label",
-    "value2minmod",
+    "data2schema",
 ]
