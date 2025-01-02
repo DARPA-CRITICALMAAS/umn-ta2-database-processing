@@ -11,7 +11,7 @@ def check_directory_path(path_directory:str, bool_create=True) -> int:
         if bool_create:
             os.makedirs(path_directory)
         else:
-            int_exists = 0
+            int_exists = -1
 
     return int_exists
 

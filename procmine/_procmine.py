@@ -29,30 +29,13 @@ class ProcMine:
         self.path_map = path_map
         self.dir_output = dir_output
         self.file_output = file_output
+
         self.dir_entities = dir_entities
 
         if verbose:
             logger.set_level('DEBUG')
         else:
             logger.set_level('WARNING')
-
-    def process(self):
-        # Converting to map dictionary
-        self.map = converting.non2dict(pl_data=self.map,
-                                       key_col='key')
-        
-        # Load_entity as dataframe
-        self.entities, minmod_entities = compile_entities(self.dir_entities)
-        logger.info(f"Entities dictionary has been created based on those available as CSV in {self.dir_entities}")
-
-        # Map labels based on mapping dictionary
-        self.data = converting.label2label(pl_data=self.data, dict_label_map=self.map)
-
-        # Convert to schema format
-        self.data = converting.data2schema(pl_data=self.data, pl_entities=self.entities)
-
-        # # Save processed output
-        self.save_output()
 
     def prepare_data_paths(self):
         # Check data file exists and load data
@@ -64,29 +47,60 @@ class ProcMine:
             raise ValueError("Unable to locate data file.",
                              f"Please check that the data {self.path_data} exists")
 
-
         # Check map file exists else direct to map assumption
-        # if not self.path_map:
-        #     logger.warning("Attribute map not provided. Result may be incorrect.")
-        #     # TODO: Add an column identification pipeline tool
+        if not self.path_map or data.check_exist(self.path_map) != 1:
+            logger.warning("Attribute map not provided. Result may be incorrect.")
+            # TODO: Add an column identification pipeline tool
+        else:
+            mode_map = data.check_mode(self.path_map)
+            if mode_map == 'dir':
+                raise ValueError("Attribute map cannot be a directory.",
+                                "Please input a single attribute map.")
+            
+            self.map = data.load_data(self.path_map, mode_map).drop_nulls(subset=['corresponding_attribute_label'])
+            
+            # TODO: append filename info to corresponding_attribute_label
 
-        # mode_map = data.check_mode(self.path_map)
-        # if self.mode_map == 'dir':
-        #     raise ValueError("Attribute map cannot be a directory.",
-        #                      "Please input a single attribute map.")
+        # Check output directory and create output directory if not exist
+        data.check_directory_path(path_directory=self.dir_output)        
+        logger.info(f"Created output directory in {self.dir_output}")   # Log output directory creation
+
+        # Check entity directory exists
+        if data.check_directory_path(path_directory=self.dir_entities, bool_create=False) == -1:
+            raise ValueError("Unable to locate entities directory.")
+        bool_entity_update = False
         
-        # self.map = data.load_data(self.path_map, mode_map).drop_nulls(subset=['corresponding_attribute_label'])
+        # Log entities directory update
+        if bool_entity_update:
+            logger.info(f"Updated entities directory in {self.dir_entities}")
 
-        # # Check output directory and create output directory if not exist
-        # # Log output directory creation
-        # logger.info(f"Created output directory in {self.dir_output}")
+        # Load dictionary that identifies selected columns for each entity type
+        path_entities_mapfile = os.path.join(self.dir_entities, '_selected_cols.pkl')
+        if data.check_exist(path_entities_mapfile) != -1:
+            self.dict_entity_cols = data.load_data(path_entities_mapfile, '.pkl')
+        else:
+            raise ValueError(f"_selected_cols.pkl file cannot be found in {self.dir_entities} folder."
+                             "Please move the '_selected_cols.pkl' file to the appropriate folder")
 
-        # # Check entity directory exists
-        # bool_entity_update = False
+    def process(self):
+        # Converting to map dictionary
+        # self.map = data.non2dict(pl_data=self.map,
+        #                          key_col='attribute_label')
         
-        # # Log entities directory update
-        # if bool_entity_update:
-        #     logger.info(f"Updated entities directory in {self.dir_entities}")
+        # Load_entity as dataframe
+        self.entities, minmod_entities = compile_entities(self.dir_entities)
+        logger.info(f"Entities dictionary has been created based on those available as CSV in {self.dir_entities}")
+
+        print(self.dict_entity_cols)
+
+        # # Map labels based on mapping dictionary
+        # self.data = converting.label2label(pl_data=self.data, dict_label_map=self.map)
+
+        # # Convert to schema format
+        # self.data = converting.data2schema(pl_data=self.data, pl_entities=self.entities)
+
+        # # # Save processed output
+        # self.save_output()
 
     def save_output(self,
                     save_format: str='json') -> None:

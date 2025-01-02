@@ -72,7 +72,7 @@ def compile_entities(dir_entities: str) -> list:
             continue
 
         path_entity = os.path.join(dir_entities, filename)
-        pl_data = data.load_data(path_entity)
+        pl_data = data.load_data(path_entity, '.csv')
 
         entity_type = data.return_basename(filename)
 
@@ -89,5 +89,7 @@ def compile_entities(dir_entities: str) -> list:
         list_pl_entities,
         how='diagonal'
     )
+
+    # TODO; check if list_entities is needed
 
     return pl_entities, list_entities

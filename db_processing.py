@@ -9,9 +9,11 @@ def main(path_data:str,
     procmine = ProcMine(path_data=path_data, path_map=path_map,
                         dir_output=dir_output, file_output=file_output)
     
+    # Load data file, load map file, check output directory, check entities directory
     procmine.prepare_data_paths()
 
-    # procmine.process()
+    # Process database
+    procmine.process()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='TA2 Database Processing')

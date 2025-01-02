@@ -27,7 +27,7 @@ def check_exist(path_file):
     
     return -1
 
-def load_data(path_file, mode_data) -> pl.DataFrame:
+def load_data(path_file, mode_data) -> pl.DataFrame | dict:
     """
     Returns all data in form of pl DataFrame
     """
@@ -45,7 +45,6 @@ def load_data(path_file, mode_data) -> pl.DataFrame:
         return pl.read_excel(path_file)
     
     if mode_data == '.pkl':
-        # Assumes the saved data is in form of polars
         with open(path_file, 'rb') as handle:
             return pickle.load(handle)
         
