@@ -7,9 +7,11 @@ def main(path_data:str,
          file_output:str=None) -> None:
     
     procmine = ProcMine(path_data=path_data, path_map=path_map,
-                         dir_output=dir_output, file_output=file_output)
+                        dir_output=dir_output, file_output=file_output)
+    
+    procmine.prepare_data_paths()
 
-    procmine.process()
+    # procmine.process()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='TA2 Database Processing')

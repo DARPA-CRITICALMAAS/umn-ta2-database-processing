@@ -1,6 +1,6 @@
 [tool.poetry]
-name = "umn_ta2-mineral-site-linkage"
-version = "0.1.0"
+name = "umn-ta2-database-processing"
+version = "0.2.0"
 description = ""
 authors = ["Jiyoon Pyo <jiyoonp0228@gmail.com>"]
 license = "MIT"

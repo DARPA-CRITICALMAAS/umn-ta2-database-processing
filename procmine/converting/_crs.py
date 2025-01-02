@@ -5,8 +5,8 @@ import geopandas as gpd
 from pyproj import CRS
 from bs4 import BeautifulSoup as bs
 
-def crs2crs(data: gpd.DataFrame, 
-            target_crs: str) -> gpd.DataFrame:
+def crs2crs(data: gpd.GeoDataFrame, 
+            target_crs: str) -> gpd.GeoDataFrame:
     """
     Converts CRS from one type to another
 

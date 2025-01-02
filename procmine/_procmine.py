@@ -37,10 +37,6 @@ class ProcMine:
             logger.set_level('WARNING')
 
     def process(self):
-        # Loading data
-        self.load_data()
-        self.load_map()
-
         # Converting to map dictionary
         self.map = converting.non2dict(pl_data=self.map,
                                        key_col='key')
@@ -56,37 +52,41 @@ class ProcMine:
         self.data = converting.data2schema(pl_data=self.data, pl_entities=self.entities)
 
         # # Save processed output
-        # self.save_output()
+        self.save_output()
 
-    def load_data(self):
-        path_file = self.path_data
+    def prepare_data_paths(self):
+        # Check data file exists and load data
+        mode_data = data.check_mode(self.path_data)
 
-        mode_data = data.check_mode(path_file)
-
-        try:
-            self.data = data.load_data(path_file, mode_data)
-            return 1
-        
-        except:
+        if data.check_exist(self.path_data) == 1:
+            self.data = data.load_data(self.path_data, mode_data)
+        else:
             raise ValueError("Unable to locate data file.",
                              f"Please check that the data {self.path_data} exists")
 
-    def load_map(self) -> None:
-        path_file = self.path_map
 
-        if not path_file:
-            if not path_file:
-                logger.warning("Attribute map not provided. Result may be incorrect.")
-                # TODO: Add an column identification pipeline tool
-            return 0
+        # Check map file exists else direct to map assumption
+        # if not self.path_map:
+        #     logger.warning("Attribute map not provided. Result may be incorrect.")
+        #     # TODO: Add an column identification pipeline tool
 
-        mode_map = data.check_mode(path_file)
-    
-        if self.mode_map == 'dir':
-            raise ValueError("Attribute map cannot be a directory.",
-                             "Please input a single attribute map.")
+        # mode_map = data.check_mode(self.path_map)
+        # if self.mode_map == 'dir':
+        #     raise ValueError("Attribute map cannot be a directory.",
+        #                      "Please input a single attribute map.")
         
-        self.map = data.load_data(path_file, mode_map).drop_nulls(subset=['corresponding_attribute_label'])
+        # self.map = data.load_data(self.path_map, mode_map).drop_nulls(subset=['corresponding_attribute_label'])
+
+        # # Check output directory and create output directory if not exist
+        # # Log output directory creation
+        # logger.info(f"Created output directory in {self.dir_output}")
+
+        # # Check entity directory exists
+        # bool_entity_update = False
+        
+        # # Log entities directory update
+        # if bool_entity_update:
+        #     logger.info(f"Updated entities directory in {self.dir_entities}")
 
     def save_output(self,
                     save_format: str='json') -> None:

@@ -46,7 +46,7 @@ class DefaultLogger:
         fh.setFormatter(logging.Formatter("%(asctime)s: %(message)s"))
         self.logger.addHandler(fh)
 
-def compile_entities(dir_entities: str) -> List[pl.DataFrame, List[str]]:
+def compile_entities(dir_entities: str) -> list:
     """
     Before calling ProcMine, recompile the entities folder
     (In case there has been any updates to the entities)
