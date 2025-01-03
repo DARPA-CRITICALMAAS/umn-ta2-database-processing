@@ -1,2 +1,6 @@
-from utils.processing._label import *
-from utils.processing._value import *
+from procmine.processing._label import *
+from procmine.processing._value import *
+
+__all__ = [
+    "add_attribute"
+]

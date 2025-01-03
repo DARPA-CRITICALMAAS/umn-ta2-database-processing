@@ -63,10 +63,6 @@ def non2dict(pl_data: pl.DataFrame,
     # Check dataframe is only two columns
     if len(pl_data.columns) != 2:
         raise ValueError("To convert to dictionary, input must be two columns")
-    
-    pl_data = pl_data.group_by(
-        key_col
-    ).agg([pl.all()])
 
     dict_data = pl_data.rows_by_key(key=key_col)
     dict_data = {k: v[0][0] for k, v in dict_data.items()}

@@ -1,12 +1,12 @@
 import os
 import warnings
-from datetime import datetime
+import polars as pl
+from datetime import datetime, timezone
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
-from procmine import data
-from procmine import converting
+from procmine import data, converting, processing
 
 from procmine._utils import (
     DefaultLogger,
@@ -58,12 +58,14 @@ class ProcMine:
                                 "Please input a single attribute map.")
             
             self.map = data.load_data(self.path_map, mode_map).drop_nulls(subset=['corresponding_attribute_label'])
-            
-            # TODO: append filename info to corresponding_attribute_label
 
         # Check output directory and create output directory if not exist
-        data.check_directory_path(path_directory=self.dir_output)        
-        logger.info(f"Created output directory in {self.dir_output}")   # Log output directory creation
+        if self.dir_output and data.check_mode(self.dir_output) == 'dir':
+            pass
+        else:
+            self.dir_output = './output/'
+            logger.info("Saving to default path: ./output")
+        data.check_directory_path(path_directory=self.dir_output)    
 
         # Check entity directory exists
         if data.check_directory_path(path_directory=self.dir_entities, bool_create=False) == -1:
@@ -83,48 +85,57 @@ class ProcMine:
                              "Please move the '_selected_cols.pkl' file to the appropriate folder")
 
     def process(self):
-        # Converting to map dictionary
-        # self.map = data.non2dict(pl_data=self.map,
-        #                          key_col='attribute_label')
+        # Combine filename to corresponding attribute label
+        self.map = self.map.with_columns(
+            tmp = pl.when(pl.col('file_name').is_null())
+                .then(pl.col('corresponding_attribute_label'))
+                .otherwise(pl.col('file_name') + pl.lit(';') + pl.col('corresponding_attribute_label'))
+        ).drop(
+            ['corresponding_attribute_label', 'file_name']
+        ).rename({'tmp': 'corresponding_attribute_label'})
         
+        # if not self.map.filter(pl.col('attribute_label') == 'uri').shape[0] == 0:
+        #     raise ValueError(f"Mapping file is missing the URI (data source) attribute."
+        #                      "This is required. Modify the data dictionary such that it has the URI attribute filled.")
+
+        # Map labels based on mapping dictionary
+        self.data, dict_literals = converting.label2label(pl_data=self.data, pl_label_map=self.map)
+
+        # Append additional literals and add literals to the original data
+        dict_literals['source'] = "UMN Matching System-ProcMinev2"
+        dict_literals['source_id'] = f"database::{dict_literals['uri']}"
+        dict_literals['reference'] = {"document": {"uri": dict_literals['uri']}}
+        dict_literals['created_by'] = "https://minmod.isi.edu/users/s/umn"
+        dict_literals['modified_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        del dict_literals['uri']
+
+        self.data = processing.add_attribute(self.data, dict_attributes=dict_literals)
+
         # Load_entity as dataframe
         self.entities, minmod_entities = compile_entities(self.dir_entities)
         logger.info(f"Entities dictionary has been created based on those available as CSV in {self.dir_entities}")
 
-        print(self.dict_entity_cols)
+        # Convert to schema format
+        self.data = converting.data2schema(pl_data=self.data, pl_entities=self.entities, dict_map_entities=self.dict_entity_cols)
 
-        # # Map labels based on mapping dictionary
-        # self.data = converting.label2label(pl_data=self.data, dict_label_map=self.map)
+        # Append datetime information
+        # current_datetime = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        # self.data = processing.add_attribute(self.data, attribute='modified_at', value=current_datetime)
 
-        # # Convert to schema format
-        # self.data = converting.data2schema(pl_data=self.data, pl_entities=self.entities)
-
-        # # # Save processed output
+        # # Save processed output
         # self.save_output()
 
     def save_output(self,
                     save_format: str='json') -> None:
         
-        path_output_dir = self.dir_output
-        path_output_file = self.file_output
-
-        if not path_output_dir:
-            logger.info("Saving to default path: ./output")
-            path_output_dir = './output'
-            data.check_directory_pathcheck(path_directory=path_output_dir)
-        
         if not path_output_file:
             file_name = data.return_basename(self.path_data)
             # file_name, _ = os.path.splitext(os.path.basename(self.path_data))
 
-            logger.info(f"Saving as default file:{file_name}output.json")
+            logger.info(f"Saving as default file:{file_name}.json")
             path_output_file = file_name
 
-        if data.check_mode(path_output_dir) != 'dir':
-            logger.warning("Inputted output directory name is not a directory path.\nSaving to default path: ./output")
-            path_output_dir = './output'
-
-        self.path_output = os.path.join(path_output_dir, path_output_file)
+        self.path_output = os.path.join(self.dir_output, self.file_output)
 
         try:
             data.save_data(self.data, path_save=self.path_output, save_format=save_format)
