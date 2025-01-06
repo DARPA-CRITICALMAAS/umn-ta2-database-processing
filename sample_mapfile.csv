@@ -1,5 +1,4 @@
 attribute_label,corresponding_attribute_label,file_name
-source_id,"https://mrdata.usgs.gov/mrds",
 record_id,dep_id,
 name,site_name,
 aliases,names,
@@ -13,4 +12,3 @@ country,country,
 state_or_province,state,
 deposit_type_candidate,dep_type,
 site_type,dev_stat,
-uri,"https://mrdata.usgs.gov/mrds",
