@@ -1,10 +1,10 @@
 import os
 import logging
-from typing import List
+from typing import List, Dict
 from datetime import datetime
 
 import polars as pl
-from procmine import data
+from procmine import data, converting
 
 class DefaultLogger:
     def __init__(self):
@@ -46,7 +46,7 @@ class DefaultLogger:
         fh.setFormatter(logging.Formatter("%(asctime)s: %(message)s"))
         self.logger.addHandler(fh)
 
-def compile_entities(dir_entities: str) -> list:
+def compile_entities(dir_entities: str, dict_entities_col: Dict[str, List[str]]) -> Dict[str, Dict[str, str]]:
     """
     Before calling ProcMine, recompile the entities folder
     (In case there has been any updates to the entities)
@@ -64,8 +64,7 @@ def compile_entities(dir_entities: str) -> list:
     if data.check_mode(dir_entities) != 'dir':
         raise ValueError("This is not an entity directory")
 
-    list_pl_entities = []
-    list_entities = []
+    dict_all_entities = {}
 
     for filename in os.listdir(dir_entities):
         if data.check_mode(filename) != '.csv':
@@ -79,17 +78,11 @@ def compile_entities(dir_entities: str) -> list:
         if 'minmod_id' not in list(pl_data.columns):
             continue
 
-        pl_data = pl_data.with_columns(
-            entity_type = pl.lit(entity_type)
+        pl_data = pl_data.select(
+            pl.col('minmod_id'),
+            pl.col(dict_entities_col[entity_type])
         )
-        list_pl_entities.append(pl_data)
-        list_entities.append(entity_type)
 
-    pl_entities = pl.concat(
-        list_pl_entities,
-        how='diagonal'
-    )
+        dict_all_entities[entity_type] = converting.non2dict(pl_data=pl_data, val_col='minmod_id')
 
-    # TODO; check if list_entities is needed
-
-    return pl_entities, list_entities
+    return dict_all_entities

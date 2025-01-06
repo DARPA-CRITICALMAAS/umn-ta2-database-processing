@@ -6,8 +6,7 @@ from strsimpy import normalized_levenshtein, jaro_winkler, metric_lcs, cosine, o
 import statistics
 
 def entity2id(entity_name: str,
-              info_source: str,
-              dict_entities: dict,) -> dict:
+              dict_sub_entities:  Dict[str, str],) -> dict:
     """
     Converts string type of entity to that maps to minmod ID
 
@@ -17,27 +16,29 @@ def entity2id(entity_name: str,
     Return
     : dict_entity: Consists of four items. opt(confidence), opt(normalized_uri), opt(observed_name), opt(source)
     """    
+    # Default entity dictionary
 
-    # TODO: Check if work as expected
-    entity_uri, confidence = identify_entity_id(observed_entity_name=entity_name, dict_entities=dict_entities)
+    dict_entity = {
+        "confidence": 0.00,
+        "normalized_uri": "",
+        "observed_name": "",
+        "source": ""
+    }
+
+    if entity_name == " " or entity_name == "":
+        return dict_entity
+
+    entity_uri, confidence = identify_entity_id(observed_entity_name=entity_name, dict_entities=dict_sub_entities)
 
     if entity_uri:
         dict_entity = {
-            'confidence': confidence,
-            'normalized_uri': entity_uri,
-            'observed_name': entity_name,
-            'source': info_source
-        }
-    else:
-        dict_entity = {
-            'confidence': None,
-            'normalized_uri': None,
-            'observed_name': None,
-            'source': None
+            "confidence": confidence,
+            "normalized_uri": entity_uri,
+            "observed_name": entity_name,
+            "source": "UMN Matching System-ProcMinev2"
         }
     
     return dict_entity
-
 
 # def identify_entity_id(string1, string2) -> Dict[str, str]|list[Dict[str, str]]:
 def identify_entity_id(observed_entity_name:str, dict_entities:dict):
@@ -46,29 +47,45 @@ def identify_entity_id(observed_entity_name:str, dict_entities:dict):
     confidence = 0.0001
 
     # Filter out non-alphas and lowercase
-    string1 = re.sub('[^a-z]', '', observed_entity_name.lower())
+    string1 = re.sub(r"[0-9]\s", '', observed_entity_name.lower())
+    if not string1:
+        return entity_uri, confidence
 
-    for entity, entity_id in dict_entities.items():
-        string2 = re.sub('[^a-z]', '', entity.lower())
+    # If there exists exact match, takes first priority
+    try:
+        entity_uri = dict_entities[observed_entity_name]
+        confidence = 0.9999
+    
+    # Fuzzy matching scenario
+    except:
+        for entity, entity_id in dict_entities.items():
+            string2 = re.sub(r"[0-9]\s", '', entity.lower())
 
-        list_text_similarity = [
-            1 - normalized_levenshtein.NormalizedLevenshtein().distance(string1, string2), 
-            jaro_winkler.JaroWinkler().similarity(string1, string2), 
-            1 - metric_lcs.MetricLCS().distance(string1, string2), 
-            cosine.Cosine(1).similarity(string1, string2), 
-            overlap_coefficient.OverlapCoefficient(1).similarity(string1, string2), 
-            sorensen_dice.SorensenDice(1).similarity(string1, string2)
-        ]
+            if not string2:
+                continue
 
-        # Average 6 difference string similarity score as confidence value
-        tmp_confidence = statistics.mean(list_text_similarity)
-        if tmp_confidence > confidence:
-            confidence = tmp_confidence
-            entity_uri = entity_id
+            list_text_similarity = [
+                1 - normalized_levenshtein.NormalizedLevenshtein().distance(string1, string2), 
+                jaro_winkler.JaroWinkler().similarity(string1, string2), 
+                1 - metric_lcs.MetricLCS().distance(string1, string2), 
+                cosine.Cosine(1).similarity(string1, string2), 
+                overlap_coefficient.OverlapCoefficient(2).similarity(string1, string2),
+                sorensen_dice.SorensenDice(2).similarity(string1, string2)
+            ]
 
-        # Break out from iteration if confidence is almost 1.0
-        if confidence > 0.9999:
-            break
+            # Average 6 difference string similarity score as confidence value
+            try:
+                tmp_confidence = statistics.mean(list_text_similarity)
+            except:
+                tmp_confidence = 0
+
+            if tmp_confidence > confidence:
+                confidence = tmp_confidence
+                entity_uri = entity_id
+
+            # Break out from iteration if confidence is almost 1.0
+            if confidence > 0.9999:
+                break
 
     return entity_uri, confidence
 

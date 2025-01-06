@@ -49,7 +49,8 @@ def non2geo(pl_data: pl.DataFrame,
     return 0
 
 def non2dict(pl_data: pl.DataFrame,
-             key_col:str) -> Dict[str, str]:
+             key_col:str=None,
+             val_col:str=None) -> Dict[str, str]:
     """
     Converts polars dataframe to dictionary. Each row is a key, val
 
@@ -60,11 +61,24 @@ def non2dict(pl_data: pl.DataFrame,
 
     Return
     """
-    # Check dataframe is only two columns
-    if len(pl_data.columns) != 2:
-        raise ValueError("To convert to dictionary, input must be two columns")
+    if not key_col and not val_col:
+        raise ValueError("Need to state either key column or value column")
 
-    dict_data = pl_data.rows_by_key(key=key_col)
-    dict_data = {k: v[0][0] for k, v in dict_data.items()}
+    if key_col:
+        dict_data = pl_data.rows_by_key(key=key_col)
+        dict_data = {k: v[0][0] for k, v in dict_data.items()}
+
+    if val_col:
+        key_cols = list(pl_data.columns)
+        key_cols.remove(val_col)
+
+        dict_data = {}
+
+        for k in key_cols:
+            pl_tmp = pl_data.select(pl.col([val_col, k])).drop_nulls(subset=[k])
+            tmp_dict_data = pl_tmp.rows_by_key(key=k)
+            tmp_dict_data = {k: v[0][0] for k, v in tmp_dict_data.items()}
+
+            dict_data.update(tmp_dict_data)  
 
     return dict_data

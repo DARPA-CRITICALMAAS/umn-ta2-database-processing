@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=pl.MapWithoutReturnDtypeWarning)
 
 from procmine import data, converting, processing
 
@@ -94,6 +95,7 @@ class ProcMine:
             ['corresponding_attribute_label', 'file_name']
         ).rename({'tmp': 'corresponding_attribute_label'})
         
+        # TODO: Raise value error if mapping file does not have URI information
         # if not self.map.filter(pl.col('attribute_label') == 'uri').shape[0] == 0:
         #     raise ValueError(f"Mapping file is missing the URI (data source) attribute."
         #                      "This is required. Modify the data dictionary such that it has the URI attribute filled.")
@@ -102,7 +104,7 @@ class ProcMine:
         self.data, dict_literals = converting.label2label(pl_data=self.data, pl_label_map=self.map)
 
         # Append additional literals and add literals to the original data
-        dict_literals['source'] = "UMN Matching System-ProcMinev2"
+        # dict_literals['source'] = "UMN Matching System-ProcMinev2"
         dict_literals['source_id'] = f"database::{dict_literals['uri']}"
         dict_literals['reference'] = {"document": {"uri": dict_literals['uri']}}
         dict_literals['created_by'] = "https://minmod.isi.edu/users/s/umn"
@@ -112,11 +114,11 @@ class ProcMine:
         self.data = processing.add_attribute(self.data, dict_attributes=dict_literals)
 
         # Load_entity as dataframe
-        self.entities, minmod_entities = compile_entities(self.dir_entities)
+        self.entities = compile_entities(self.dir_entities, self.dict_entity_cols)
         logger.info(f"Entities dictionary has been created based on those available as CSV in {self.dir_entities}")
-
+        
         # Convert to schema format
-        self.data = converting.data2schema(pl_data=self.data, pl_entities=self.entities, dict_map_entities=self.dict_entity_cols)
+        self.data = converting.data2schema(pl_data=self.data, dict_all_entities=self.entities)
 
         # Append datetime information
         # current_datetime = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')

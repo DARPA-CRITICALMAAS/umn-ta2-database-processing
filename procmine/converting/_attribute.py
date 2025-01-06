@@ -61,8 +61,7 @@ def label2label(pl_data: pl.DataFrame,
     return pl_data, dict_literals
 
 def data2schema(pl_data: pl.DataFrame,
-                pl_entities: pl.DataFrame,
-                dict_map_entities: dict,) -> pl.DataFrame:
+                dict_all_entities: Dict[str, Dict[str, str]],) -> pl.DataFrame:
     """
     TODO: fill up information
     Maps value to minmod format
@@ -85,9 +84,39 @@ def data2schema(pl_data: pl.DataFrame,
     list_deposit_type = list({'record_id', 'deposit_type'} & set_actual_cols)
     pl_deposit_type = pl_data.select(pl.col(list_deposit_type))
 
+    # TODO: Pop deposit type
+
+    # pl_partial = pl_deposit_type.filter(
+    #     pl.col('deposit_type').str.replace(r"\s", "") != ""
+    # ).with_columns(
+    #     pl.col('deposit_type').map_elements(lambda x: entity2id(x, dict_sub_entities=dict_all_entities['deposit_type']))
+    # )
+
     # PLDF Location Info
-    list_location_info = list({'record_id', 'country', 'crs', 'location', 'state'} & set_actual_cols)
+    # list_location_info = list({'record_id', 'country', 'crs', 'location', 'state_or_province'} & set_actual_cols)
+    list_location_info = list({'record_id', 'country', 'state_or_province'} & set_actual_cols)
     pl_location_info = pl_data.select(pl.col(list_location_info))
+    dict_location_info = {}
+
+    print(list_location_info)
+
+    list_location_info.remove('record_id')
+    for li in list_location_info:
+        unique_items = pl_location_info.unique(subset=[li])[li].to_list()
+
+        tmp_mapping_dict = {}
+
+        for i in unique_items:
+            tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities[li])
+
+        pl_location_info = pl_location_info.with_columns(
+            pl.col(li).replace(tmp_mapping_dict, return_dtype=pl.Struct)
+        )
+
+        print(pl_location_info)
+
+        break
+    # TODO: Check popping for country and state
 
     # PLDF Mineral Inventory
     list_mineral_inventory = list({'record_id', 'commodity', 'grade', 'grade_unit'} & set_actual_cols)
@@ -115,23 +144,3 @@ def data2schema(pl_data: pl.DataFrame,
 
     return pl_data
 
-def data_default(pl_data: pl.DataFrame,
-                 dict_defaults: Dict[str, str]) -> pl.DataFrame:
-    """
-    Append default data to dataframe
-
-    Argument
-    : pl_data: 
-    : dict_defaults:
-
-    Return
-    """
-    pl_data = pl_data.with_columns(
-        modified_at = pl.lit(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')),
-        source = pl.lit(dict_defaults['source']),
-        source_id = pl.lit(f"database::{dict_defaults['source']}"),
-        created_by = pl.lit(dict_defaults['created_by']),
-        reference = pl.struct(pl.struct(pl.lit(dict_defaults['uri']).alias('uri')).alias('document')),
-    )
-
-    return pl_data
