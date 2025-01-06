@@ -1,9 +1,9 @@
 # Dockerfile, Image, Container
-FROM python:3.10
+FROM python:3.11
 
 WORKDIR umn-ta2-database-processing
 
-ADD fusemine.py .
+ADD db_processing.py .
 ADD process_data_to_schema.py .
 
 COPY pyproject.toml poetry.lock ./
