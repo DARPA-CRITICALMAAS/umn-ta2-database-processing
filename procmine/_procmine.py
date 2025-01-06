@@ -96,32 +96,28 @@ class ProcMine:
         ).rename({'tmp': 'corresponding_attribute_label'})
         
         if self.map.filter(pl.col('attribute_label') == 'uri').is_empty():
-            raise ValueError(f"Mapping file is missing the URI (data source) attribute."
+            raise ValueError(f"Mapping file is missing the URI (data source) attribute.\n"
                              "This is required. Modify the data dictionary such that it has the URI attribute filled.")
 
         # Map labels based on mapping dictionary
-        # self.data, dict_literals = converting.label2label(pl_data=self.data, pl_label_map=self.map)
+        self.data, dict_literals = converting.label2label(pl_data=self.data, pl_label_map=self.map)
 
-        # # Append additional literals and add literals to the original data
-        # # dict_literals['source'] = "UMN Matching System-ProcMinev2"
-        # dict_literals['source_id'] = f"database::{dict_literals['uri']}"
-        # dict_literals['reference'] = {"document": {"uri": dict_literals['uri']}}
-        # dict_literals['created_by'] = "https://minmod.isi.edu/users/s/umn"
-        # dict_literals['modified_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-        # del dict_literals['uri']
+        # Append additional literals and add literals to the original data
+        # dict_literals['source'] = "UMN Matching System-ProcMinev2"
+        dict_literals['source_id'] = f"database::{dict_literals['uri']}"
+        dict_literals['reference'] = {"document": {"uri": dict_literals['uri']}}
+        dict_literals['created_by'] = "https://minmod.isi.edu/users/s/umn"
+        dict_literals['modified_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        del dict_literals['uri']
 
-        # self.data = processing.add_attribute(self.data, dict_attributes=dict_literals)
+        self.data = processing.add_attribute(self.data, dict_attributes=dict_literals)
 
-        # # Load_entity as dataframe
-        # self.entities = compile_entities(self.dir_entities, self.dict_entity_cols)
-        # logger.info(f"Entities dictionary has been created based on those available as CSV in {self.dir_entities}")
+        # Load_entity as dataframe
+        self.entities = compile_entities(self.dir_entities, self.dict_entity_cols)
+        logger.info(f"Entities dictionary has been created based on those available as CSV in {self.dir_entities}")
         
-        # # Convert to schema format
-        # self.data = converting.data2schema(pl_data=self.data, dict_all_entities=self.entities)
-
-        # Append datetime information
-        # current_datetime = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-        # self.data = processing.add_attribute(self.data, attribute='modified_at', value=current_datetime)
+        # Convert to schema format
+        self.data = converting.data2schema(pl_data=self.data, dict_all_entities=self.entities)
 
         # # Save processed output
         # self.save_output()
