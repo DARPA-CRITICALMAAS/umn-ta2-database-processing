@@ -48,12 +48,12 @@ def identify_entity_id(observed_entity_name:str, dict_entities:dict):
 
     # Filter out non-alphas and lowercase
     string1 = re.sub(r"[0-9]\s", '', observed_entity_name.lower())
-    if not string1:
+    if not string1 or string1 == '':
         return entity_uri, confidence
 
     # If there exists exact match, takes first priority
     try:
-        entity_uri = dict_entities[observed_entity_name]
+        entity_uri = dict_entities[string1]
         confidence = 0.9999
     
     # Fuzzy matching scenario
@@ -61,15 +61,20 @@ def identify_entity_id(observed_entity_name:str, dict_entities:dict):
         for entity, entity_id in dict_entities.items():
             string2 = re.sub(r"[0-9]\s", '', entity.lower())
 
-            if not string2:
+            if not string2 or string2 == '':
                 continue
+
+            try:
+                oc = overlap_coefficient.OverlapCoefficient(2).similarity(string1, string2)
+            except:
+                oc = 0
 
             list_text_similarity = [
                 1 - normalized_levenshtein.NormalizedLevenshtein().distance(string1, string2), 
                 jaro_winkler.JaroWinkler().similarity(string1, string2), 
                 1 - metric_lcs.MetricLCS().distance(string1, string2), 
                 cosine.Cosine(1).similarity(string1, string2), 
-                overlap_coefficient.OverlapCoefficient(2).similarity(string1, string2),
+                oc,
                 sorensen_dice.SorensenDice(2).similarity(string1, string2)
             ]
 

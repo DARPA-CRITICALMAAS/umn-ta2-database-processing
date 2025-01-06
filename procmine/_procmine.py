@@ -7,7 +7,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=pl.MapWithoutReturnDtypeWarning)
 
-from procmine import data, converting, processing
+from procmine import data, converting
 
 from procmine._utils import (
     DefaultLogger,
@@ -110,34 +110,65 @@ class ProcMine:
         dict_literals['modified_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         del dict_literals['uri']
 
-        self.data = processing.add_attribute(self.data, dict_attributes=dict_literals)
+        self.data = converting.add_attribute(self.data, dict_attributes=dict_literals)
 
         # Load_entity as dataframe
         self.entities = compile_entities(self.dir_entities, self.dict_entity_cols)
         logger.info(f"Entities dictionary has been created based on those available as CSV in {self.dir_entities}")
+
+        # If crs available, convert crs to epsg
+        if 'crs' in list(self.data.columns):
+            crs_val = self.data['crs'].unique().to_list()
+
+            dict_crs = {}
+            for c in crs_val:
+                epsg_val = converting.crs2epsg(crs_value=c)
+                dict_crs[c] = epsg_val
+
+            self.data = self.data.with_columns(pl.col('crs').replace(dict_crs))
+
+        # Case 1: latitude and longitude present
+        if 'latitude' in list(self.data.columns) and 'longitude' in list(self.data.columns):
+            # Remove those without any location information
+            data_no_loc = self.data.filter(pl.col('longitude') == "", pl.col('latitude') == "").drop(['latitude', 'longitude'])
+            self.data = self.data.filter(pl.col('longitude') != "", pl.col('latitude') != "")
+            epsg_val = self.data['crs'].unique().to_list()[0]
+            gpd_data = converting.non2geo(self.data, 
+                                          str_lat_col='latitude', str_long_col='longitude',
+                                          crs_val=epsg_val)
+            
+            self.data = pl.concat([converting.geo2non(gpd_data), data_no_loc], 
+                                  how='diagonal')
+        # Case 2: location present
+        elif 'location' in list(self.data.columns):
+            # Remove those without any location information
+            data_no_loc = self.data.filter(pl.col('location') == "")
+            self.data = self.data.filter(pl.col('location') != "")
+            epsg_val = self.data['crs'].unique().to_list()[0]
+            gpd_data = converting.non2geo(self.data, 
+                                          str_geo_col='location',
+                                          crs_val=epsg_val)
+            
+            self.data = pl.concat([converting.geo2non(gpd_data), data_no_loc], 
+                                  how='diagonal')
+        
+        # Pop necessary columns
+        self.data = self.data.with_columns(
+            pl.col(['aliases', 'state_or_province', 'country', 'commodity', 'deposit_type']).str.replace_all(r"\s*[\|,;]\s*", ";").str.split(';')
+        )
         
         # Convert to schema format
-        self.data = converting.data2schema(pl_data=self.data, dict_all_entities=self.entities)
-
-        # # Save processed output
-        # self.save_output()
+        self.data = converting.data2schema(pl_input=self.data, dict_all_entities=self.entities)
 
     def save_output(self,
                     save_format: str='json') -> None:
         
-        if not path_output_file:
-            file_name = data.return_basename(self.path_data)
-            # file_name, _ = os.path.splitext(os.path.basename(self.path_data))
-
-            logger.info(f"Saving as default file:{file_name}.json")
-            path_output_file = file_name
-
         self.path_output = os.path.join(self.dir_output, self.file_output)
 
         try:
             data.save_data(self.data, path_save=self.path_output, save_format=save_format)
+            logger.info(f"Data saved to {self.path_output}.{save_format}")
 
         except:
-            # TODO: Test if enters here when unsupported save format is given
             logger.warning("Unacceptable save format. Defaulting to pickle.")
             data.save_data(self.data, path_save=self.path_output, save_format='pickle')

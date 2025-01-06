@@ -15,7 +15,8 @@ def geo2non(gpd_data: gpd.GeoDataFrame) -> pl.DataFrame:
 
     Return:
     """
-    gpd_data['crs'] = str(gpd_data.crs)
+    if 'crs' not in list(gpd_data.columns):
+        gpd_data['crs'] = str(gpd_data.crs)
     gpd_data['location'] = gpd_data['geometry'].apply(wkt.dumps)
 
     gpd_data = gpd_data.drop('geometry', axis=1)
@@ -24,7 +25,8 @@ def geo2non(gpd_data: gpd.GeoDataFrame) -> pl.DataFrame:
     return pl_data
 
 def non2geo(pl_data: pl.DataFrame,
-            str_geo_col: str='location',
+            str_lat_col: str=None, str_long_col: str=None,
+            str_geo_col: str=None,
             crs_val: str='EPSG:4326') -> gpd.GeoDataFrame:
     """
     # TODO: fill in information
@@ -36,17 +38,27 @@ def non2geo(pl_data: pl.DataFrame,
 
     Return
     """
-    df_data = pl_data.to_pandas()
-    df_data[str_geo_col] = df_data[str_geo_col].apply(lambda x: wkt.loads(x))
 
-    gpd_data = gpd.GeoDataFrame(
-        df_data,
-        geometry=str_geo_col,
-        crs=crs_val)
-    
-    gpd_data = gpd_data.drop(str_geo_col, axis=1)
+    if str_lat_col:
+        df_data = pl_data.with_columns(pl.col([str_lat_col, str_long_col]).cast(pl.Float64)).to_pandas()
+        gpd_data = gpd.GeoDataFrame(
+            df_data,
+            geometry=gpd.points_from_xy(df_data[str_long_col], df_data[str_lat_col]),
+            crs=crs_val
+        ).drop([str_lat_col, str_long_col], axis=1)
 
-    return 0
+    if str_geo_col:
+        df_data = pl_data.to_pandas()
+        df_data[str_geo_col] = df_data[str_geo_col].apply(lambda x: wkt.loads(x))
+
+        gpd_data = gpd.GeoDataFrame(
+            df_data,
+            geometry=str_geo_col,
+            crs=crs_val)
+        
+        gpd_data = gpd_data.drop(str_geo_col, axis=1)
+
+    return gpd_data
 
 def non2dict(pl_data: pl.DataFrame,
              key_col:str=None,

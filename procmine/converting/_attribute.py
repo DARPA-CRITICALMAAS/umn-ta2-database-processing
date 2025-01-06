@@ -7,6 +7,35 @@ from ._entity import *
 from ._crs import *
 from ._datatype import *
 
+def add_attribute(pl_data: pl.DataFrame, 
+                  attribute:str = None, value = None,
+                  dict_attributes:dict = None) -> pl.DataFrame:
+    
+    if attribute and value:        
+        pl_data = pl_data.with_columns(
+            pl.lit(value).alias(attribute)
+        )
+
+    if dict_attributes:
+        for attribute, value in dict_attributes.items():
+            pl_data = pl_data.with_columns(
+                tmp = pl.lit(value)
+            )
+            try:
+                pl_data = pl_data.rename({"tmp": attribute})
+            except pl.DuplicateError:
+                pl_data = pl_data.with_columns(
+                    pl.concat_str(
+                        [
+                            pl.col(attribute),
+                            pl.col("tmp")
+                        ],
+                        separator="; ",
+                    )
+                ).drop("tmp")
+
+    return pl_data
+
 def label2label(pl_data: pl.DataFrame,
                 pl_label_map: pl.DataFrame):
     """
@@ -60,67 +89,127 @@ def label2label(pl_data: pl.DataFrame,
 
     return pl_data, dict_literals
 
-def data2schema(pl_data: pl.DataFrame,
+def data2schema(pl_input: pl.DataFrame,
                 dict_all_entities: Dict[str, Dict[str, str]],) -> pl.DataFrame:
     """
     TODO: fill up information
     Maps value to minmod format
 
     Argument
-    : pl_data: 
+    : pl_input: 
     : list_attribute: 
 
     Return
     """
+    default_entity = {
+        "confidence": 0.00,
+        "normalized_uri": None,
+        "observed_name": None,
+        "source": None,
+    }
 
-    set_actual_cols = set(list(pl_data.columns))
+    set_actual_cols = set(list(pl_input.columns))
 
     # PLDF general
-    list_general = list({'record_id', 'source_id', 'name', 'aliases', 'modified_at', 'created_by', 'site_type', 'reference'} & set_actual_cols)
-    pl_general = pl_data.select(pl.col(list_general))
-    # TODO: Split aliases to list
+    list_general = list({'record_id', 'source_id', 'name', 'aliases', 'modified_at', 'created_by', 'site_type', 'reference', 'location'} & set_actual_cols)
+    pl_output = pl_input.select(pl.col(list_general))
 
-    # PLDF Deposit Type
-    list_deposit_type = list({'record_id', 'deposit_type'} & set_actual_cols)
-    pl_deposit_type = pl_data.select(pl.col(list_deposit_type))
+    # PLDF need_to_map
+    list_map = list({'deposit_type', 'country', 'state_or_province', 'commodity', 'epsg', 'grade_unit'} & set_actual_cols)
+    pl_map = pl_input.select(
+        pl.col('record_id'),
+        pl.col(list_map)
+    )
 
-    # TODO: Pop deposit type
+    for mi in list_map:
+        pl_tmp = pl_map.select(pl.col(['record_id', mi]))
+        bool_type_list = False
+        if pl_tmp[mi].dtype == pl.List:
+            pl_tmp = pl_tmp.with_columns(pl.col(mi).list.unique()).explode(mi)
+            bool_type_list = True
 
-    # pl_partial = pl_deposit_type.filter(
-    #     pl.col('deposit_type').str.replace(r"\s", "") != ""
-    # ).with_columns(
-    #     pl.col('deposit_type').map_elements(lambda x: entity2id(x, dict_sub_entities=dict_all_entities['deposit_type']))
-    # )
-
-    # PLDF Location Info
-    # list_location_info = list({'record_id', 'country', 'crs', 'location', 'state_or_province'} & set_actual_cols)
-    list_location_info = list({'record_id', 'country', 'state_or_province'} & set_actual_cols)
-    pl_location_info = pl_data.select(pl.col(list_location_info))
-    dict_location_info = {}
-
-    print(list_location_info)
-
-    list_location_info.remove('record_id')
-    for li in list_location_info:
-        unique_items = pl_location_info.unique(subset=[li])[li].to_list()
-
+        unique_items = pl_tmp.unique(subset=[mi])[mi].to_list()
         tmp_mapping_dict = {}
 
         for i in unique_items:
-            tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities[li])
+            tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities[mi])
+            
+        pl_tmp = pl_tmp.rename({mi: 'tmp'}).with_columns(
+            pl.col('tmp').replace(tmp_mapping_dict, default=default_entity).alias(mi)
+        ).drop('tmp')
 
-        pl_location_info = pl_location_info.with_columns(
-            pl.col(li).replace(tmp_mapping_dict, return_dtype=pl.Struct)
-        )
+        if bool_type_list:
+            pl_tmp = pl_tmp.group_by('record_id').agg([pl.all()])
 
-        print(pl_location_info)
+        pl_output.join(pl_tmp, on='record_id')
 
-        break
-    # TODO: Check popping for country and state
 
-    # PLDF Mineral Inventory
-    list_mineral_inventory = list({'record_id', 'commodity', 'grade', 'grade_unit'} & set_actual_cols)
-    pl_mineral_inventory = pl_data.select(pl.col(list_mineral_inventory))
+    print(pl_output)
+        
+
+
+
+
+
+    # pl_data = pl_data.select(pl.col('record_id'), pl.col(list_explodable))
+    # for e in list_explodable:
+    #     pl_data = pl_data.explode(e)
+    # print(pl_data)
+
+    # PLDF Deposit Type & Location Information
+    # list_dep_locinfo = list({'record_id', 'deposit_type', 'country'} & set_actual_cols)
+    # pl_dep_locinfo = pl_data.select(pl.col(list_dep_locinfo))
+
+    # list_dep_locinfo.remove('record_id')
+    # if len(list_dep_locinfo) >= 1:
+    #     for li in list_dep_locinfo:
+    #         unique_items = pl_dep_locinfo.unique(subset=[li])[li].to_list()
+    #         tmp_mapping_dict = {}
+
+    #         for i in unique_items:
+    #             tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities[li])
+
+    #             pl_dep_locinfo = pl_dep_locinfo.rename({li: 'tmp'}).with_columns(
+    #                 pl.col('tmp').replace(tmp_mapping_dict, default=default_entity).alias(li)
+    #             )
+
+    # print(pl_dep_locinfo)
+
+
+    # PLDF Location Info (geo, text)
+    # TODO: Convert crs to epsg code
+    # list_location_geo = list({'record_id', 'location', 'crs'} & set_actual_cols)
+    # pl_location_geo = pl_data.select(pl.col(list_location_geo))
+
+    # # crs2epsg(crs_value:str)
+
+    # # TODO: crs range check
+
+    # # list_location_info = list({'record_id', 'country', 'crs', 'location', 'state_or_province'} & set_actual_cols)
+
+    # # TODO: add in country as hint for state_or_province
+    # for li in list_location_info:
+    #     unique_items = pl_location_info.unique(subset=[li])[li].to_list()
+
+    #     tmp_mapping_dict = {}
+
+    #     for i in unique_items:
+    #         tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities[li])
+
+    #     print(tmp_mapping_dict)
+
+    #     pl_location_info = pl_location_info.rename({li: 'tmp'}).with_columns(
+    #         pl.col('tmp').replace(tmp_mapping_dict, default=default_entity).alias(li)
+    #     )
+
+    #     print(pl_location_info)
+
+    #     break
+    # # TODO: Check popping for country and state
+
+    # # PLDF Mineral Inventory
+    # list_mineral_inventory = list({'record_id', 'commodity', 'grade', 'grade_unit'} & set_actual_cols)
+    # pl_mineral_inventory = pl_data.select(pl.col(list_mineral_inventory))
 
     # # TODO: Load pl_data to spark with each processable component individually
     # data_rdd = 0

@@ -80,7 +80,7 @@ def compile_entities(dir_entities: str, dict_entities_col: Dict[str, List[str]])
 
         pl_data = pl_data.select(
             pl.col('minmod_id'),
-            pl.col(dict_entities_col[entity_type])
+            pl.col(dict_entities_col[entity_type]).str.to_lowercase()
         )
 
         dict_all_entities[entity_type] = converting.non2dict(pl_data=pl_data, val_col='minmod_id')
