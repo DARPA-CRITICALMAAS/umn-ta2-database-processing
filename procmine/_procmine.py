@@ -103,7 +103,6 @@ class ProcMine:
         self.data, dict_literals = converting.label2label(pl_data=self.data, pl_label_map=self.map)
 
         # Append additional literals and add literals to the original data
-        # dict_literals['source'] = "UMN Matching System-ProcMinev2"
         dict_literals['source_id'] = f"database::{dict_literals['uri']}"
         dict_literals['reference'] = {"document": {"uri": dict_literals['uri']}}
         dict_literals['created_by'] = "https://minmod.isi.edu/users/s/umn"
@@ -129,7 +128,7 @@ class ProcMine:
 
         # Case 1: latitude and longitude present
         if 'latitude' in list(self.data.columns) and 'longitude' in list(self.data.columns):
-            # Remove those without any location information
+            # Temporarily store those without any location information
             data_no_loc = self.data.filter(pl.col('longitude') == "", pl.col('latitude') == "").drop(['latitude', 'longitude'])
             self.data = self.data.filter(pl.col('longitude') != "", pl.col('latitude') != "")
             epsg_val = self.data['crs'].unique().to_list()[0]
@@ -141,7 +140,7 @@ class ProcMine:
                                   how='diagonal')
         # Case 2: location present
         elif 'location' in list(self.data.columns):
-            # Remove those without any location information
+            # Temporarily store those without any location information
             data_no_loc = self.data.filter(pl.col('location') == "")
             self.data = self.data.filter(pl.col('location') != "")
             epsg_val = self.data['crs'].unique().to_list()[0]
