@@ -115,7 +115,8 @@ def data2schema(pl_input: pl.DataFrame,
     pl_output = pl_input.select(pl.col(list_general))
 
     # PLDF need_to_map
-    list_map = list({'deposit_type', 'country', 'state_or_province', 'commodity', 'epsg', 'grade_unit'} & set_actual_cols)
+    # state_or_province
+    list_map = list({'deposit_type', 'country', 'commodity', 'epsg', 'grade_unit'} & set_actual_cols)
     pl_map = pl_input.select(
         pl.col('record_id'),
         pl.col(list_map)
@@ -145,11 +146,24 @@ def data2schema(pl_input: pl.DataFrame,
 
 
     print(pl_output)
-        
+     
+    # TODO: Check if all are correct6
+    # Replace column name epsg to crs
+    pl_output = pl_output.rename({'epsg': 'crs'})
 
+    # TODO: Create grade object (consists unit and value, rename grade to value and grade_unit unit)
+    list_grade = list({'grade', 'grade_unit'} & set_actual_cols)
 
+    
+    list_others = list({'source_id', 'record_id', 'name', 'aliases' , 'modified_at', 'created_by', 'site_type', 'deposit_type_candidate'} & set_actual_cols)
+    list_loc_info = list({'location', 'country', 'state_or_province', 'crs'} & set_actual_cols)
+    list_min_inven = list({'commodity', 'grade', 'reference'} * set_actual_cols)
 
-
+    pl_output = pl_output.select(
+        pl.col(list_others),
+        location_info = pl.struct(pl.col(list_loc_info)),
+        mineral_inventory = pl.struct(pl.col(list_min_inven))
+    )
 
     # pl_data = pl_data.select(pl.col('record_id'), pl.col(list_explodable))
     # for e in list_explodable:
@@ -231,5 +245,5 @@ def data2schema(pl_input: pl.DataFrame,
     #     pl.col(['name', 'aliases', 'deposit_type_candidate', 'location_info', 'mineral_inventory', 'modified_at', 'created_by', 'record_id', 'source_id', 'site_type', 'reference'])
     # )
 
-    return pl_data
+    return pl_output
 

@@ -156,6 +156,10 @@ class ProcMine:
             pl.col(['aliases', 'state_or_province', 'country', 'commodity', 'deposit_type']).str.replace_all(r"\s*[\|,;]\s*", ";").str.split(';')
         )
         
+        # Rename crs column to epsg (for conversion purpose)
+        if 'crs' in list(self.data.columns):
+            self.data = self.data.rename({'crs': 'epsg'})
+
         # Convert to schema format
         self.data = converting.data2schema(pl_input=self.data, dict_all_entities=self.entities)
 
