@@ -116,7 +116,7 @@ def data2schema(pl_input: pl.DataFrame,
 
     # PLDF need_to_map
     # state_or_province
-    list_map = list({'deposit_type', 'country', 'commodity', 'epsg', 'grade_unit'} & set_actual_cols)
+    list_map = list({'deposit_type', 'country', 'state_or_province', 'commodity', 'epsg', 'grade_unit'} & set_actual_cols)
     pl_map = pl_input.select(
         pl.col('record_id'),
         pl.col(list_map)
@@ -142,108 +142,30 @@ def data2schema(pl_input: pl.DataFrame,
         if bool_type_list:
             pl_tmp = pl_tmp.group_by('record_id').agg([pl.all()])
 
-        pl_output.join(pl_tmp, on='record_id')
+        pl_output = pl_output.join(pl_tmp, on='record_id')
 
-
-    print(pl_output)
-     
     # TODO: Check if all are correct6
     # Replace column name epsg to crs
-    pl_output = pl_output.rename({'epsg': 'crs'})
+    try:
+        pl_output = pl_output.rename({'epsg': 'crs'})
+    except:
+        # Means there was no epsg or crs information
+        pass
 
+    set_actual_cols = set( list(pl_output.columns))
     # TODO: Create grade object (consists unit and value, rename grade to value and grade_unit unit)
     list_grade = list({'grade', 'grade_unit'} & set_actual_cols)
-
+    pl_output = pl_output.rename({'grade':'value', 'grade_unit':'unit'})
     
     list_others = list({'source_id', 'record_id', 'name', 'aliases' , 'modified_at', 'created_by', 'site_type', 'deposit_type_candidate'} & set_actual_cols)
     list_loc_info = list({'location', 'country', 'state_or_province', 'crs'} & set_actual_cols)
-    list_min_inven = list({'commodity', 'grade', 'reference'} * set_actual_cols)
+    list_min_inven = list({'commodity', 'grade', 'reference'} & set_actual_cols)
 
     pl_output = pl_output.select(
         pl.col(list_others),
         location_info = pl.struct(pl.col(list_loc_info)),
         mineral_inventory = pl.struct(pl.col(list_min_inven))
     )
-
-    # pl_data = pl_data.select(pl.col('record_id'), pl.col(list_explodable))
-    # for e in list_explodable:
-    #     pl_data = pl_data.explode(e)
-    # print(pl_data)
-
-    # PLDF Deposit Type & Location Information
-    # list_dep_locinfo = list({'record_id', 'deposit_type', 'country'} & set_actual_cols)
-    # pl_dep_locinfo = pl_data.select(pl.col(list_dep_locinfo))
-
-    # list_dep_locinfo.remove('record_id')
-    # if len(list_dep_locinfo) >= 1:
-    #     for li in list_dep_locinfo:
-    #         unique_items = pl_dep_locinfo.unique(subset=[li])[li].to_list()
-    #         tmp_mapping_dict = {}
-
-    #         for i in unique_items:
-    #             tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities[li])
-
-    #             pl_dep_locinfo = pl_dep_locinfo.rename({li: 'tmp'}).with_columns(
-    #                 pl.col('tmp').replace(tmp_mapping_dict, default=default_entity).alias(li)
-    #             )
-
-    # print(pl_dep_locinfo)
-
-
-    # PLDF Location Info (geo, text)
-    # TODO: Convert crs to epsg code
-    # list_location_geo = list({'record_id', 'location', 'crs'} & set_actual_cols)
-    # pl_location_geo = pl_data.select(pl.col(list_location_geo))
-
-    # # crs2epsg(crs_value:str)
-
-    # # TODO: crs range check
-
-    # # list_location_info = list({'record_id', 'country', 'crs', 'location', 'state_or_province'} & set_actual_cols)
-
-    # # TODO: add in country as hint for state_or_province
-    # for li in list_location_info:
-    #     unique_items = pl_location_info.unique(subset=[li])[li].to_list()
-
-    #     tmp_mapping_dict = {}
-
-    #     for i in unique_items:
-    #         tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities[li])
-
-    #     print(tmp_mapping_dict)
-
-    #     pl_location_info = pl_location_info.rename({li: 'tmp'}).with_columns(
-    #         pl.col('tmp').replace(tmp_mapping_dict, default=default_entity).alias(li)
-    #     )
-
-    #     print(pl_location_info)
-
-    #     break
-    # # TODO: Check popping for country and state
-
-    # # PLDF Mineral Inventory
-    # list_mineral_inventory = list({'record_id', 'commodity', 'grade', 'grade_unit'} & set_actual_cols)
-    # pl_mineral_inventory = pl_data.select(pl.col(list_mineral_inventory))
-
-    # # TODO: Load pl_data to spark with each processable component individually
-    # data_rdd = 0
-    # list_rdds = []
-    # # (Key, value) = ((source_id, record_id), ({comp_name:comps, source:source}))
-
-    # # TODO: join the four rdds
-    # location_rdd = location_rdd.map(lambda x: (('source_id', 'record_id'), {'country': x[0], 'state_or_province': x[1], 'crs': x[2], 'location': x[3]}))
-    # dep_type_rdd = dep_type_rdd.reduceByKey(lambda a, b: a + b)
-    # mineral_inventory_rdd = mineral_inventory_rdd.reduceByKey(lambda a, b: a + b)
-
-    # # Create objects
-    # pl_data = pl_data.with_columns(
-    #     location_info = pl.struct(pl.col(['country', 'crs', 'location', 'state_or_province'])),
-    #     mineral_inventory = pl.struct(pl.col(['commodity', 'grade', 'reference']))
-    # )
-    # # Sanity check
-    # pl_data = pl_data.select(
-    #     pl.col(['name', 'aliases', 'deposit_type_candidate', 'location_info', 'mineral_inventory', 'modified_at', 'created_by', 'record_id', 'source_id', 'site_type', 'reference'])
-    # )
 
     return pl_output
 
