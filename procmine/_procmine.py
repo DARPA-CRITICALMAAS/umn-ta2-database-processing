@@ -42,6 +42,7 @@ class ProcMine:
         # Check data file exists and load data
         mode_data = data.check_mode(self.path_data)
 
+        # TODO: Create a version that can load directory
         if data.check_exist(self.path_data) == 1:
             self.data = data.load_data(self.path_data, mode_data)
         else:
@@ -155,6 +156,8 @@ class ProcMine:
         self.data = self.data.with_columns(
             pl.col(['aliases', 'state_or_province', 'country', 'commodity', 'deposit_type']).str.replace_all(r"\s*[\|,;]\s*", ";").str.split(';')
         )
+
+        # TODO: Map PGE and REE of commodity to the list of commodities
         
         # Rename crs column to epsg (for conversion purpose)
         if 'crs' in list(self.data.columns):

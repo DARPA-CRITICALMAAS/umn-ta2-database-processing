@@ -174,6 +174,8 @@ def data2schema(pl_input: pl.DataFrame,
         pl.col(list_others),
         location_info = pl.struct(pl.col(list_loc_info)),
         mineral_inventory = pl.struct(pl.col(list_min_inven))
+    ).group_by('record_id').agg([pl.all()]).with_columns(
+        pl.exclude(['record_id', 'mineral_inventory']).list.first()
     )
 
     return pl_output
