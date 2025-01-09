@@ -115,7 +115,6 @@ def data2schema(pl_input: pl.DataFrame,
     pl_output = pl_input.select(pl.col(list_general))
 
     # PLDF need_to_map
-    # state_or_province
     list_map = list({'deposit_type', 'country', 'state_or_province', 'commodity', 'epsg', 'grade_unit'} & set_actual_cols)
     pl_map = pl_input.select(
         pl.col('record_id'),
@@ -144,7 +143,6 @@ def data2schema(pl_input: pl.DataFrame,
 
         pl_output = pl_output.join(pl_tmp, on='record_id')
 
-    # TODO: Check if all are correct6
     # Replace column name epsg to crs
     try:
         pl_output = pl_output.rename({'epsg': 'crs'})
@@ -152,14 +150,25 @@ def data2schema(pl_input: pl.DataFrame,
         # Means there was no epsg or crs information
         pass
 
-    set_actual_cols = set( list(pl_output.columns))
-    # TODO: Create grade object (consists unit and value, rename grade to value and grade_unit unit)
-    list_grade = list({'grade', 'grade_unit'} & set_actual_cols)
-    pl_output = pl_output.rename({'grade':'value', 'grade_unit':'unit'})
+    # Rename tonnage, grade, and grade unit to that in schema
+    if 'tonnage' in list(pl_output.columns):
+        pl_output = pl_output.rename({'tonnage': 'contained_metal'})
+    if 'grade' in list(pl_output.columns):
+        pl_output = pl_output.rename({'grade': 'value'})
+    if 'grade_unit' in list(pl_output.columns):
+        pl_output = pl_output.rename({'grade_unit': 'unit'})
     
+    list_grade = list({'value', 'unit'} & set(list(pl_output.columns)))
+    if len(list_grade) != 0:
+        pl_output = pl_output.with_columns(
+            grade = pl.struct(pl.col(list_grade))
+        ).drop(list_grade)
+    
+    # Convert to schema
+    set_actual_cols = set(list(pl_output.columns))
     list_others = list({'source_id', 'record_id', 'name', 'aliases' , 'modified_at', 'created_by', 'site_type', 'deposit_type_candidate'} & set_actual_cols)
     list_loc_info = list({'location', 'country', 'state_or_province', 'crs'} & set_actual_cols)
-    list_min_inven = list({'commodity', 'grade', 'reference'} & set_actual_cols)
+    list_min_inven = list({'commodity', 'grade', 'contained_metal', 'reference'} & set_actual_cols)
 
     pl_output = pl_output.select(
         pl.col(list_others),
