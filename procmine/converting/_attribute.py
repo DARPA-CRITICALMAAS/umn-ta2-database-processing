@@ -110,73 +110,99 @@ def data2schema(pl_input: pl.DataFrame,
 
     set_actual_cols = set(list(pl_input.columns))
 
+    # TODO: General (those that for sure only has one)
+
+    # TODO: apply to epsg, state, country, etc.
+
+    # TODO: Commodity
+    # map the commodity 
+
     # PLDF general
     list_general = list({'record_id', 'source_id', 'name', 'aliases', 'modified_at', 'created_by', 'site_type', 'reference', 'location'} & set_actual_cols)
-    pl_output = pl_input.select(pl.col(list_general))
+    pl_output = pl_input.select(pl.col(list_general)).group_by('record_id').agg([pl.all()]).with_columns(
+        pl.exclude('record_id').list.unique(),
+    ).with_columns(
+        pl.exclude(['record_id']).list.get(0),
+        name_additional = pl.col('name').list.slice(1,)
+    )
 
     # PLDF need_to_map
-    list_map = list({'deposit_type', 'country', 'state_or_province', 'commodity', 'epsg', 'grade_unit'} & set_actual_cols)
+    list_map = list({'deposit_type', 'country', 'state_or_province', 'epsg'} & set_actual_cols)
     pl_map = pl_input.select(
         pl.col('record_id'),
         pl.col(list_map)
-    )
+    ).unique(subset=['record_id'], keep='first')
+    # .with_columns(
+    #     pl.exclude(['record_id']).list.get(0)
+    # )
 
-    for mi in list_map:
-        pl_tmp = pl_map.select(pl.col(['record_id', mi]))
-        bool_type_list = False
-        if pl_tmp[mi].dtype == pl.List:
-            pl_tmp = pl_tmp.with_columns(pl.col(mi).list.unique()).explode(mi)
-            bool_type_list = True
 
-        unique_items = pl_tmp.unique(subset=[mi])[mi].to_list()
-        tmp_mapping_dict = {}
+    # deposit_type, name, aliases
 
-        for i in unique_items:
-            tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities[mi])
+    print(pl_map)
+
+    # list_commod = list({'commodity', 'grade_unit', 'grade', 'tonnage'} & set_actual_cols)
+    # pl_commod = pl_input.select(
+    #     pl.col('record_id'),
+    #     pl.col(list_commod)
+    # )
+
+    # for mi in list_map:
+    #     pl_tmp = pl_map.select(pl.col(['record_id', mi]))
+    #     bool_type_list = False
+    #     if pl_tmp[mi].dtype == pl.List:
+    #         pl_tmp = pl_tmp.with_columns(pl.col(mi).list.unique()).explode(mi)
+    #         bool_type_list = True
+
+    #     unique_items = pl_tmp.unique(subset=[mi])[mi].to_list()
+    #     tmp_mapping_dict = {}
+
+    #     for i in unique_items:
+    #         tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities[mi])
             
-        pl_tmp = pl_tmp.rename({mi: 'tmp'}).with_columns(
-            pl.col('tmp').replace(tmp_mapping_dict, default=default_entity).alias(mi)
-        ).drop('tmp')
+    #     pl_tmp = pl_tmp.rename({mi: 'tmp'}).with_columns(
+    #         pl.col('tmp').replace(tmp_mapping_dict, default=default_entity).alias(mi)
+    #     ).drop('tmp')
 
-        if bool_type_list:
-            pl_tmp = pl_tmp.group_by('record_id').agg([pl.all()])
+    #     if bool_type_list:
+    #         pl_tmp = pl_tmp.group_by('record_id').agg([pl.all()])
 
-        pl_output = pl_output.join(pl_tmp, on='record_id')
+    #     pl_output = pl_output.join(pl_tmp, on='record_id')
 
-    # Replace column name epsg to crs
-    try:
-        pl_output = pl_output.rename({'epsg': 'crs'})
-    except:
-        # Means there was no epsg or crs information
-        pass
+    # # Replace column name epsg to crs
+    # try:
+    #     pl_output = pl_output.rename({'epsg': 'crs'})
+    # except:
+    #     # Means there was no epsg or crs information
+    #     pass
 
-    # Rename tonnage, grade, and grade unit to that in schema
-    if 'tonnage' in list(pl_output.columns):
-        pl_output = pl_output.rename({'tonnage': 'contained_metal'})
-    if 'grade' in list(pl_output.columns):
-        pl_output = pl_output.rename({'grade': 'value'})
-    if 'grade_unit' in list(pl_output.columns):
-        pl_output = pl_output.rename({'grade_unit': 'unit'})
+    # # Rename tonnage, grade, and grade unit to that in schema
+    # if 'tonnage' in list(pl_output.columns):
+    #     pl_output = pl_output.rename({'tonnage': 'contained_metal'})
+    # if 'grade' in list(pl_output.columns):
+    #     pl_output = pl_output.rename({'grade': 'value'})
+    # if 'grade_unit' in list(pl_output.columns):
+    #     pl_output = pl_output.rename({'grade_unit': 'unit'})
     
-    list_grade = list({'value', 'unit'} & set(list(pl_output.columns)))
-    if len(list_grade) != 0:
-        pl_output = pl_output.with_columns(
-            grade = pl.struct(pl.col(list_grade))
-        ).drop(list_grade)
+    # list_grade = list({'value', 'unit'} & set(list(pl_output.columns)))
+    # if len(list_grade) != 0:
+    #     pl_output = pl_output.with_columns(
+    #         grade = pl.struct(pl.col(list_grade))
+    #     ).drop(list_grade)
     
-    # Convert to schema
-    set_actual_cols = set(list(pl_output.columns))
-    list_others = list({'source_id', 'record_id', 'name', 'aliases' , 'modified_at', 'created_by', 'site_type', 'deposit_type_candidate'} & set_actual_cols)
-    list_loc_info = list({'location', 'country', 'state_or_province', 'crs'} & set_actual_cols)
-    list_min_inven = list({'commodity', 'grade', 'contained_metal', 'reference'} & set_actual_cols)
+    # # Convert to schema
+    # set_actual_cols = set(list(pl_output.columns))
+    # list_others = list({'source_id', 'record_id', 'name', 'aliases' , 'modified_at', 'created_by', 'site_type', 'deposit_type_candidate'} & set_actual_cols)
+    # list_loc_info = list({'location', 'country', 'state_or_province', 'crs'} & set_actual_cols)
+    # list_min_inven = list({'commodity', 'grade', 'contained_metal', 'reference'} & set_actual_cols)
 
-    pl_output = pl_output.select(
-        pl.col(list_others),
-        location_info = pl.struct(pl.col(list_loc_info)),
-        mineral_inventory = pl.struct(pl.col(list_min_inven))
-    ).group_by('record_id').agg([pl.all()]).with_columns(
-        pl.exclude(['record_id', 'mineral_inventory']).list.first()
-    )
+    # pl_output = pl_output.select(
+    #     pl.col(list_others),
+    #     location_info = pl.struct(pl.col(list_loc_info)),
+    #     mineral_inventory = pl.struct(pl.col(list_min_inven))
+    # ).group_by('record_id').agg([pl.all()]).with_columns(
+    #     pl.exclude(['record_id', 'mineral_inventory']).list.first()
+    # )
 
     return pl_output
 

@@ -39,27 +39,35 @@ class ProcMine:
             logger.set_level('WARNING')
 
     def prepare_data_paths(self):
+        mode_map = data.check_mode(self.path_map)
+        if mode_map == 'dir':
+            raise ValueError("Attribute map cannot be a directory.",
+                             "Please input a single attribute map.")
+        
+        self.map = data.load_data(self.path_map, mode_map).drop_nulls(subset=['corresponding_attribute_label'])
+
+        # URI and record_id is required. If not available, ask user to fill in this information in the data dictionary
+        list_cols = self.map['attribute_label'].to_list()
+        if 'uri' not in list_cols:
+            raise ValueError("Mapping file is missing the URI (data source) attribute.\n"
+                             "This is required. Modify the data dictionary such that it has the URI attribute filled.")
+        if 'record_id' not in list_cols:
+            raise ValueError("Mapping file is missing the record id attribute.\n"
+                             "This is required. Modify the data dictionary such that it has the record id attribute filled.")
+        
+        # Get record_id attribute label
+        join_col = self.map.filter(pl.col('attribute_label') == 'record_id').item(0, 'corresponding_attribute_label')
+
         # Check data file exists and load data
         mode_data = data.check_mode(self.path_data)
 
-        # TODO: Create a version that can load directory
         if data.check_exist(self.path_data) == 1:
-            self.data = data.load_data(self.path_data, mode_data)
+            self.data = data.load_data(self.path_data, mode_data,
+                                       join_col = join_col,
+                                       list_files = self.map['file_name'].str.to_lowercase().to_list())
         else:
             raise ValueError("Unable to locate data file.",
                              f"Please check that the data {self.path_data} exists")
-
-        # Check map file exists else direct to map assumption
-        if not self.path_map or data.check_exist(self.path_map) != 1:
-            logger.warning("Attribute map not provided. Result may be incorrect.")
-            # TODO: Add an column identification pipeline tool
-        else:
-            mode_map = data.check_mode(self.path_map)
-            if mode_map == 'dir':
-                raise ValueError("Attribute map cannot be a directory.",
-                                "Please input a single attribute map.")
-            
-            self.map = data.load_data(self.path_map, mode_map).drop_nulls(subset=['corresponding_attribute_label'])
 
         # Check output directory and create output directory if not exist
         if self.dir_output and data.check_mode(self.dir_output) == 'dir':
@@ -91,14 +99,10 @@ class ProcMine:
         self.map = self.map.with_columns(
             tmp = pl.when(pl.col('file_name').is_null())
                 .then(pl.col('corresponding_attribute_label'))
-                .otherwise(pl.col('file_name') + pl.lit(';') + pl.col('corresponding_attribute_label'))
+                .otherwise(pl.col('file_name').str.to_lowercase() + pl.lit(';') + pl.col('corresponding_attribute_label'))
         ).drop(
             ['corresponding_attribute_label', 'file_name']
         ).rename({'tmp': 'corresponding_attribute_label'})
-        
-        if self.map.filter(pl.col('attribute_label') == 'uri').is_empty():
-            raise ValueError(f"Mapping file is missing the URI (data source) attribute.\n"
-                             "This is required. Modify the data dictionary such that it has the URI attribute filled.")
 
         # Map labels based on mapping dictionary
         self.data, dict_literals = converting.label2label(pl_data=self.data, pl_label_map=self.map)
@@ -152,13 +156,20 @@ class ProcMine:
             self.data = pl.concat([converting.geo2non(gpd_data), data_no_loc], 
                                   how='diagonal')
         
-        # Pop necessary columns
+        # Maps PGE and REE commodity to list of pre-defined commodities
+        path_commod_groups = os.path.join(self.dir_entities, '_commod_groups.pkl')
+        if data.check_exist(path_commod_groups) != -1:
+            dict_commod_groups = data.load_data(path_commod_groups, '.pkl')
         self.data = self.data.with_columns(
-            pl.col(['aliases', 'state_or_province', 'country', 'commodity', 'deposit_type']).str.replace_all(r"\s*[\|,;]\s*", ";").str.split(';')
+            pl.col('commodity').str.replace_many(dict_commod_groups)
+        )       # TODO: check
+
+        # Pop necessary columns
+        col_to_pop = set(list(self.data.columns)) & {'aliases', 'state_or_province', 'country', 'commodity', 'deposit_type'}
+        self.data = self.data.with_columns(
+            pl.col(col_to_pop).str.replace_all(r"\s*[\|,;]\s*", ";").str.split(';')
         )
 
-        # TODO: Map PGE and REE of commodity to the list of commodities
-        
         # Rename crs column to epsg (for conversion purpose)
         if 'crs' in list(self.data.columns):
             self.data = self.data.rename({'crs': 'epsg'})

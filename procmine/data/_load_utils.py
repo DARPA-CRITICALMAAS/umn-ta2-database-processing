@@ -1,5 +1,5 @@
 import os
-import logging
+from typing import Dict, List
 
 import pickle
 import polars as pl
@@ -27,7 +27,8 @@ def check_exist(path_file):
     
     return -1
 
-def load_data(path_file, mode_data) -> pl.DataFrame | dict:
+def load_data(path_file:str, mode_data:str,
+              join_col:str=None, list_files:List[str]=[]) -> pl.DataFrame | dict:
     """
     Returns all data in form of pl DataFrame
     """
@@ -35,7 +36,6 @@ def load_data(path_file, mode_data) -> pl.DataFrame | dict:
         return pl.read_csv(path_file, encoding='utf8-lossy', ignore_errors=True)
     
     if mode_data == '.tsv' or mode_data == '.txt':
-        # TODO: Check if this is correct
         return pl.read_csv(path_file, separator='\t', encoding='utf8-lossy', ignore_errors=True)
     
     if mode_data == '.json':
@@ -68,7 +68,14 @@ def load_data(path_file, mode_data) -> pl.DataFrame | dict:
         list_subdata = []
 
         for i in os.listdir(path_file):
-            pl_subdata = load_data(i)
+            filename, filemode = os.path.splitext(i)
+            if filename.lower() not in list_files:
+                continue
+            
+            file_path = os.path.join(path_file, i)
+            pl_subdata = load_data(path_file=file_path, mode_data=filemode).rename(
+                lambda column_name: f"{filename.lower()};{column_name}" if column_name != join_col else column_name
+            )
             list_subdata.append(pl_subdata)
 
         pl_data = pl.concat(
@@ -77,4 +84,3 @@ def load_data(path_file, mode_data) -> pl.DataFrame | dict:
         )
 
         return pl_data
-        
