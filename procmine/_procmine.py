@@ -95,6 +95,27 @@ class ProcMine:
                              "Please move the '_selected_cols.pkl' file to the appropriate folder")
 
     def process(self):
+        commods = []
+        alias_commod = ''
+        if self.map.filter(pl.col('attribute_label') == 'commodity').shape[0] > 1:
+            if ('grade' in self.map['attribute_label'].to_list()) or ('tonnage' in self.map['attribute_label'].to_list()):
+                try:
+                    grade_file = self.map.filter(pl.col('attribute_label') == 'grade')['file_name'].to_list()
+                except: pass
+                try:
+                    tonnage_file = self.map.filter(pl.col('attribute_label') == 'tonnage')['file_name'].to_list()
+                except: pass
+
+                commodity_files = self.map.filter(pl.col('attribute_label') == 'commodity')['file_name'].to_list()
+                commod_files = list(set(commodity_files) - set(grade_file) - set(tonnage_file))
+                other_files = list(set(grade_file)|set(tonnage_file))
+
+                commod_items = self.map.filter(pl.col('attribute_label') == 'commodity').with_columns(
+                    tmp = pl.col('file_name').str.to_lowercase() + pl.lit(';') + pl.col('corresponding_attribute_label'))
+
+                commods = commod_items.filter(pl.col('file_name').is_in(commod_files))['tmp'].to_list()
+                alias_commod = commod_items.filter(pl.col('file_name').is_in(other_files))['tmp'].to_list()[0]
+
         # Combine filename to corresponding attribute label
         self.map = self.map.with_columns(
             tmp = pl.when(pl.col('file_name').is_null())
@@ -103,6 +124,23 @@ class ProcMine:
         ).drop(
             ['corresponding_attribute_label', 'file_name']
         ).rename({'tmp': 'corresponding_attribute_label'})
+
+        # If multiple commodities (including with grade/tonnage)
+        if len(commods) > 0:
+            rec_id = self.map.filter(pl.col('attribute_label') == 'record_id').item(0, 'corresponding_attribute_label')
+
+            pl_tmp = self.data.select(
+                pl.col(rec_id),
+                pl.concat_str(commods, separator="; ").alias(alias_commod),
+            )
+
+            self.data = self.data.drop(commods)
+            self.data = pl.concat(
+                [self.data, pl_tmp],
+                how='diagonal'
+            )
+
+            self.map = self.map.filter(~pl.col('corresponding_attribute_label').is_in(commods))
 
         # Map labels based on mapping dictionary
         self.data, dict_literals = converting.label2label(pl_data=self.data, pl_label_map=self.map)
@@ -182,7 +220,8 @@ class ProcMine:
     def save_output(self,
                     save_format: str='json') -> None:
         
-        self.path_output = os.path.join(self.dir_output, self.file_output)
+        # Default saving with extension large
+        self.path_output = os.path.join(self.dir_output, f'{self.file_output}.large')
 
         try:
             data.save_data(self.data, path_save=self.path_output, save_format=save_format)

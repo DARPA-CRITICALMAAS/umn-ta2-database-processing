@@ -112,7 +112,7 @@ def data2schema(pl_input: pl.DataFrame,
 
     list_general = list({'record_id', 'source_id', 'name', 'aliases', 'modified_at', 'created_by', 'site_type', 'reference', 'location'} & set_actual_cols)
     pl_output = pl_input.select(pl.col(list_general)).group_by('record_id').agg([pl.all()]).with_columns(
-        pl.col('name').list.unique(),
+        pl.col('name').list.unique().list.eval(pl.element().filter(pl.element() != "")),
         pl.exclude(['record_id', 'name']).list.first(),
     ).with_columns(
         pl.col('name').list.first(),
@@ -157,11 +157,11 @@ def data2schema(pl_input: pl.DataFrame,
         pl_output = pl_output.join(pl_tmp, on='record_id')
 
     # Replace column name epsg to crs
-    try:
-        pl_output = pl_output.rename({'epsg': 'crs'})
-    except:
-        # Means there was no epsg or crs information
-        pass
+    try: pl_output = pl_output.rename({'epsg': 'crs'})
+    except: pass
+
+    try: pl_output = pl_output.rename({'deposit_type': 'deposit_type_candidate'})
+    except: pass
 
     # Convert to schema
     set_output_cols = set(list(pl_output.columns))
@@ -200,9 +200,9 @@ def data2schema(pl_input: pl.DataFrame,
 
     # Rename tonnage, grade, and grade unit to that in schema
     if 'tonnage' in list(pl_commod.columns):
-        pl_commod = pl_commod.rename({'tonnage': 'contained_metal'})
+        pl_commod = pl_commod.rename({'tonnage': 'contained_metal'}).with_columns(pl.col('contained_metal').cast(pl.Float64, strict=False))
     if 'grade' in list(pl_commod.columns):
-        pl_commod = pl_commod.rename({'grade': 'value'})
+        pl_commod = pl_commod.rename({'grade': 'value'}).with_columns(pl.col('value').cast(pl.Float64, strict=False))
     if 'grade_unit' in list(pl_commod.columns):
         pl_commod = pl_commod.rename({'grade_unit': 'unit'})
     

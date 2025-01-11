@@ -33,7 +33,7 @@ def entity2id(entity_name: str,
     if entity_uri:
         dict_entity = {
             "confidence": confidence,
-            "normalized_uri": entity_uri,
+            "normalized_uri": f"https://minmod.isi.edu/resource/{entity_uri}",
             "observed_name": entity_name,
             "source": "UMN Matching System-ProcMinev2"
         }
@@ -92,41 +92,3 @@ def identify_entity_id(observed_entity_name:str, dict_entities:dict):
                 break
 
     return entity_uri, confidence
-
-def clean_nones(input_object: dict | list) -> dict | list:
-    """
-    Recursively remove all None values from either a dictionary or a list, and returns a new dictionary or list without the None values
-
-    Arguments:
-    input_object = either a dictionary or a list type that may or may not consist of a None value
-    
-    Return
-    either a dictionary or a list type (same as the input) that does not consists of any None values
-    """
-
-    # List case
-    if isinstance(input_object, list):
-        list_objects = []
-        for x in input_object:
-            if x is not None and x !="":
-                cleaned_item = clean_nones(x)
-                if cleaned_item:
-                    list_objects.append(clean_nones(x))
-        
-        return list_objects
-    
-    # Dictionary case
-    elif isinstance(input_object, dict):
-        cleaned_dict = {
-            key: clean_nones(value)
-            for key, value in input_object.items()
-            if value and value is not None and value != ""
-        }
-
-        if not cleaned_dict:
-            return None
-
-        return cleaned_dict
-
-    else:
-        return input_object
