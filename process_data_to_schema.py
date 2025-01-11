@@ -15,8 +15,8 @@ def main(path_data:str,
     # Process database
     procmine.process()
 
-    # # Save output
-    # procmine.save_output()
+    # Save output
+    procmine.save_output()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='TA2 Database Processing')

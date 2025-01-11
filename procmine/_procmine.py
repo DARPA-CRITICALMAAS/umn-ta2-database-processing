@@ -161,8 +161,8 @@ class ProcMine:
         if data.check_exist(path_commod_groups) != -1:
             dict_commod_groups = data.load_data(path_commod_groups, '.pkl')
         self.data = self.data.with_columns(
-            pl.col('commodity').str.replace_many(dict_commod_groups)
-        )       # TODO: check
+            pl.col('commodity').str.replace_many(dict_commod_groups, ascii_case_insensitive=True)
+        )
 
         # Pop necessary columns
         col_to_pop = set(list(self.data.columns)) & {'aliases', 'state_or_province', 'country', 'commodity', 'deposit_type'}
@@ -173,6 +173,8 @@ class ProcMine:
         # Rename crs column to epsg (for conversion purpose)
         if 'crs' in list(self.data.columns):
             self.data = self.data.rename({'crs': 'epsg'})
+        if 'grade_unit' in list(self.data.columns):
+            self.data = self.data.rename({'grade_unit': 'unit'})
 
         # Convert to schema format
         self.data = converting.data2schema(pl_input=self.data, dict_all_entities=self.entities)
