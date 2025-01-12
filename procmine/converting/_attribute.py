@@ -176,11 +176,11 @@ def data2schema(pl_input: pl.DataFrame,
     )
 
     # Create mineral_iventories
-    list_commodity = list({'commodity', 'grade', 'unit', 'tonnage'} & set_actual_cols)
+    list_commodity = list({'commodity', 'grade', 'unit', 'tonnage', 'reference'} & set_actual_cols)
     pl_commod = pl_input.select(
         pl.col('record_id'),
         pl.col(list_commodity)
-    ).unique(subset=list_commodity)
+    ).drop_nulls().unique(subset=list_commodity)
 
     list_cmap = list({'commodity', 'unit'} & set_actual_cols)
     for ci in list_cmap:
