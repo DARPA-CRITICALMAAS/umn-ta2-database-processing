@@ -1,8 +1,6 @@
 import argparse
 from procmine import ProcMine
 
-import pickle # remove later
-
 def main(path_data:str,
          path_map:str=None,
          dir_output:str=None,
@@ -16,9 +14,6 @@ def main(path_data:str,
 
     # Process database
     procmine.process()
-
-    with open('./procmine.pkl', 'wb') as handle:
-        pickle.dump(procmine, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     # Save output
     procmine.save_output()
