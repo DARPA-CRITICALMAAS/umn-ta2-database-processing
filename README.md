@@ -48,8 +48,8 @@ docker exec -it <container_id> /bin/bash
 
 2. Move data into the container
 ```
-docker cp <path_to_raw_data> <container_id>:/umn-ta2-mineral-site-linkage
-docker cp <path_to_attribute_map> <container_id>:/umn-ta2-mineral-site-linkage
+docker cp <path_to_raw_data> <container_id>:/umn-ta2-database-processing
+docker cp <path_to_attribute_map> <container_id>:/umn-ta2-database-processing
 ```
 - `path_to_raw_data`: Path (either file or directory) to the raw mineral site database.
 - `path_to_raw_data`: Path (either file or directory) to the raw mineral site database.
@@ -57,14 +57,14 @@ docker cp <path_to_attribute_map> <container_id>:/umn-ta2-mineral-site-linkage
 
 3. Run the command
 ```
-poetry run python3 process_data_to_schema.py --raw_data ./<raw_data_filename> --attribute_map ./<attribute_map_filename> --schema_output_filename <file_name>
+poetry run python3 process_data_to_schema.py --path_data ./<raw_data_filename> --path_map ./<attribute_map_filename> --output_filename <file_name>
 ```
 - `file_name`: Desired filename of the processed raw data
 
 4. Move the data from Docker container to local
 ```
 exit
-docker cp <container_id>:/umn-ta2-mineral-site-linkage/outputs/<file_name>.json <save_path>
+docker cp <container_id>:/umn-ta2-database-processing/outputs/<file_name>.large.json <save_path>
 ```
 - `save_path`: Path of directory to store the processed raw data
 
