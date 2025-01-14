@@ -1,7 +1,8 @@
 from typing import Dict, List
 import polars as pl
-import pyspark
+import pickle # Delete later
 from datetime import datetime, timezone
+import decimal
 
 from ._entity import *
 from ._crs import *
@@ -171,6 +172,7 @@ def data2schema(pl_input: pl.DataFrame,
     pl_output = pl_output.select(
         pl.col(list_others),
         location_info = pl.struct(pl.col(list_loc_info)),
+        reference = pl.col('reference').map_elements(lambda x: [x])
     ).group_by('record_id').agg([pl.all()]).with_columns(
         pl.exclude('record_id').list.first()
     )
@@ -180,7 +182,7 @@ def data2schema(pl_input: pl.DataFrame,
     pl_commod = pl_input.select(
         pl.col('record_id'),
         pl.col(list_commodity)
-    ).drop_nulls().unique(subset=list_commodity)
+    ).unique(subset=list_commodity, maintain_order=True)
 
     list_cmap = list({'commodity', 'unit'} & set_actual_cols)
     for ci in list_cmap:
@@ -198,6 +200,11 @@ def data2schema(pl_input: pl.DataFrame,
             pl.col(ci).replace(tmp_mapping_dict, default=default_entity)
         )
 
+    if 'commodity' in list(pl_commod.columns):
+        pl_commod = pl_commod.filter(
+            pl.col('commodity').struct.field('confidence') > 0
+        )
+
     # Rename tonnage, grade, and grade unit to that in schema
     if 'tonnage' in list(pl_commod.columns):
         pl_commod = pl_commod.rename({'tonnage': 'contained_metal'}).with_columns(pl.col('contained_metal').cast(pl.Float64, strict=False))
@@ -205,7 +212,7 @@ def data2schema(pl_input: pl.DataFrame,
         pl_commod = pl_commod.rename({'grade': 'value'}).with_columns(pl.col('value').cast(pl.Float64, strict=False))
     if 'grade_unit' in list(pl_commod.columns):
         pl_commod = pl_commod.rename({'grade_unit': 'unit'})
-    
+
     list_grade = list({'value', 'unit'} & set(list(pl_commod.columns)))
     if len(list_grade) != 0:
         pl_commod = pl_commod.with_columns(

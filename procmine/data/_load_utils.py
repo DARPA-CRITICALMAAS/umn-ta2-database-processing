@@ -8,6 +8,8 @@ import geopandas as gpd
 
 from shapely import wkt
 
+pl.Config.set_fmt_float("full") # Convert scientific notation to float
+
 def return_basename(path_file:str) -> str:
     file_name, _ = os.path.splitext(os.path.basename(path_file))
 

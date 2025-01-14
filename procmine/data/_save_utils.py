@@ -1,9 +1,12 @@
 import os
 import pickle
 from json import loads, dump
+import orjson
 
 import polars as pl
 import geopandas as gpd
+
+pl.Config.set_fmt_float("full") # Convert scientific notation to float
 
 def check_directory_path(path_directory:str, bool_create=True) -> int:
     int_exists = 1
@@ -74,6 +77,10 @@ def save_data(input_data:pl.DataFrame,
         json_data = drop_nones(drop_nones(drop_nones(json_data)))
 
         with open(f'{path_save}.json', 'w') as f:
+            # json_str = orjson.dumps(json_data, option=orjson.OPT_INDENT_2)
+
+            # print(json_str)
+            # f.write(json_str)
             dump(json_data, f, indent=4, default=str)
 
     elif save_format.lower() in ['geojson', 'geo']:

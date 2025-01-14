@@ -98,6 +98,7 @@ class ProcMine:
         commods = []
         alias_commod = ''
         if self.map.filter(pl.col('attribute_label') == 'commodity').shape[0] > 1:
+            # Cleaning step for case where there is commodity associated with grade/tonnage and commodity not-associated without
             if ('grade' in self.map['attribute_label'].to_list()) or ('tonnage' in self.map['attribute_label'].to_list()):
                 try:
                     grade_file = self.map.filter(pl.col('attribute_label') == 'grade')['file_name'].to_list()
@@ -151,8 +152,16 @@ class ProcMine:
         dict_literals['created_by'] = "https://minmod.isi.edu/users/s/umn"
         dict_literals['modified_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         del dict_literals['uri']
-
         self.data = converting.add_attribute(self.data, dict_attributes=dict_literals)
+
+        # If both commodities and deposit types available, combine commodities and deposit type information
+        if len({'commodity', 'deposit_type'} & set(list(self.data.columns))) == 2:
+            self.data = self.data.with_columns(
+                pl.concat_str(
+                    [pl.col('deposit_type', 'commodity')],
+                    separator=' '
+                ).alias('deposit_type')
+            )
 
         # Load_entity as dataframe
         self.entities = compile_entities(self.dir_entities, self.dict_entity_cols)

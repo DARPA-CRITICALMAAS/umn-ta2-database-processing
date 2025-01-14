@@ -5,6 +5,8 @@ import geopandas as gpd
 from pyproj import CRS
 from bs4 import BeautifulSoup as bs
 
+pl.Config.set_fmt_float("full") # Convert scientific notation to float
+
 def crs2crs(data: gpd.GeoDataFrame, 
             target_crs: str) -> gpd.GeoDataFrame:
     """
