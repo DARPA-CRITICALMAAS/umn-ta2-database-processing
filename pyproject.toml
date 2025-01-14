@@ -3,7 +3,7 @@ name = "umn-ta2-database-processing"
 version = "0.2.0"
 description = "ProcMine: CriticalMAAS TA2 pipeline to process databases"
 authors = [
-    {name = "Your Name",email = "you@example.com"}
+    {name = "Jiyoon Pyo",email = "jiyoonp0228@gmail.com"}
 ]
 license = "MIT"
 readme = "README.md"
