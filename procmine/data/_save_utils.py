@@ -1,7 +1,7 @@
 import os
 import pickle
 from json import loads, dump
-import orjson
+# import orjson
 
 import polars as pl
 import geopandas as gpd
@@ -78,8 +78,6 @@ def save_data(input_data:pl.DataFrame,
 
         with open(f'{path_save}.json', 'w') as f:
             # json_str = orjson.dumps(json_data, option=orjson.OPT_INDENT_2)
-
-            # print(json_str)
             # f.write(json_str)
             dump(json_data, f, indent=4, default=str)
 
