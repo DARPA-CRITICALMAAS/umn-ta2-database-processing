@@ -1,15 +1,24 @@
-[tool.poetry]
+[project]
 name = "umn-ta2-database-processing"
 version = "0.2.0"
-description = ""
-authors = ["Jiyoon Pyo <jiyoonp0228@gmail.com>"]
+description = "ProcMine: CriticalMAAS TA2 pipeline to process databases"
+authors = [
+    {name = "Your Name",email = "you@example.com"}
+]
 license = "MIT"
 readme = "README.md"
-package-mode = false
+requires-python = "^3.11"
+dependencies = [
+    "polars (>=1.19.0,<2.0.0)",
+    "geopandas (>=1.0.1,<2.0.0)",
+    "requests (>=2.32.3,<3.0.0)",
+    "bs4 (>=0.0.2,<0.0.3)",
+    "regex (>=2024.11.6,<2025.0.0)",
+    "strsimpy (>=0.2.1,<0.3.0)",
+    "pyarrow (>=18.1.0,<19.0.0)"
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
