@@ -22,19 +22,21 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='TA2 Database Processing')
 
     parser.add_argument('--csv', action='store_true',
-                        help='Test loading csv. Assume csv path at ')
+                        help='Test loading csv. Assume csv data path at ./data/csv_v.csv, dictionary at ./data/dict_csv.csv')
     
     parser.add_argument('--xlsx', action='store_true',
-                        help='Test loading csv. Assume csv path at ')
+                        help='Test loading xlsx. Assume xlsx path at ./data/xlsx_v.xlsx, dictionary at ./data/dict_dir.csv')
     
     parser.add_argument('--gdb', action='store_true',
-                        help='Test loading csv. Assume csv path at ')
+                        help='Test loading gdb. Assume gdb path at ./data/gdb_v.gdb, dictionary at ./data/dict_gdb.csv')
     
     parser.add_argument('--json', action='store_true',
-                        help='Test loading csv. Assume csv path at ')
+                        help='Test loading json. Assume json path at ./data/json_v.json, dictionary at ./data/json_dir.csv')
     
     parser.add_argument('--dir', action='store_true',
-                        help='Test loading csv. Assume csv path at ')
+                        help='Test loading dir. Assume dir path at ./data/dir_v, dictionary at ./data/dict_dir.csv')
+    
+    parser.add_argument('--all', action='store_true')
     
     args = parser.parse_args()
 
