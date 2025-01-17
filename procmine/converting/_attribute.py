@@ -111,13 +111,23 @@ def data2schema(pl_input: pl.DataFrame,
 
     set_actual_cols = set(list(pl_input.columns))
 
-    list_general = list({'record_id', 'source_id', 'name', 'aliases', 'modified_at', 'created_by', 'site_type', 'reference', 'location'} & set_actual_cols)
+    list_general = list({'record_id', 'source_id', 'name', 'aliases', 'modified_at', 'created_by', 'site_type', 'reference', 'location', 'mineral_form', 'alteration', 'concentration_process', 'ore_control', 'host_rock_unit', 'host_rock_type', 'associated_rock_unit', 'associated_rock_type', 'structure', 'tectonic', 'discovered_year'} & set_actual_cols)
     pl_output = pl_input.select(pl.col(list_general)).group_by('record_id').agg([pl.all()]).with_columns(
         pl.col('name').list.unique().list.eval(pl.element().filter(pl.element() != "")),
         pl.exclude(['record_id', 'name']).list.first(),
     ).with_columns(
         pl.col('name').list.first(),
         name_additional = pl.col('name').list.slice(1,)
+    )
+
+    # Map host rock and associated rock
+    pl_output = pl_output.rename({'host_rock_type': 'type', 'host_rock_unit': 'unit'}).with_columns(
+        host_rock = pl.struct(pl.col(['type', 'unit']))
+    ).drop(['type', 'unit']).rename({'associated_rock_type': 'type', 'associated_rock_unit': 'unit'}).with_columns(
+        associated_rock = pl.struct(pl.col(['type', 'unit']))
+    ).drop(['type', 'unit']).with_columns(
+        pl.col('discovered_year').cast(pl.Int64, strict=False),
+        pl.col('mineral_form').str.replace_all(r"\s*[\|,;]\s*", ";").str.split(';')
     )
 
     # Add to aliases
@@ -166,12 +176,13 @@ def data2schema(pl_input: pl.DataFrame,
 
     # Convert to schema
     set_output_cols = set(list(pl_output.columns))
-    list_others = list({'source_id', 'record_id', 'name', 'aliases' , 'modified_at', 'created_by', 'site_type', 'deposit_type_candidate'} & set_output_cols)
+    list_others = list({'source_id', 'record_id', 'name', 'aliases' , 'modified_at', 'created_by', 'site_type', 'deposit_type_candidate', 'mineral_form'} & set_output_cols)
     list_loc_info = list({'location', 'country', 'state_or_province', 'crs'} & set_output_cols)
 
     pl_output = pl_output.select(
         pl.col(list_others),
         location_info = pl.struct(pl.col(list_loc_info)),
+        geology_info = pl.struct(pl.col(['concentration_process', 'ore_control', 'host_rock', 'associated_rock', 'structure', 'tectonic'])),
         reference = pl.col('reference').map_elements(lambda x: [x])
     ).group_by('record_id').agg([pl.all()]).with_columns(
         pl.exclude('record_id').list.first()
