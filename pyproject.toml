@@ -1,6 +1,6 @@
 [project]
 name = "umn-ta2-database-processing"
-version = "2.0.0"
+version = "2.1.0"
 description = "ProcMine: CriticalMAAS TA2 pipeline to process databases"
 authors = [
     {name = "Jiyoon Pyo",email = "jiyoonp0228@gmail.com"}

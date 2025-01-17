@@ -76,7 +76,7 @@ def load_data(path_file:str, mode_data:str,
             
             file_path = os.path.join(path_file, i)
             pl_subdata = load_data(path_file=file_path, mode_data=filemode).rename(
-                lambda column_name: f"{filename.lower()};{column_name}" if column_name != join_col else column_name
+                lambda column_name: f"{filename.lower()};{column_name}" if (column_name and column_name != join_col) else column_name
             )
             list_subdata.append(pl_subdata)
 

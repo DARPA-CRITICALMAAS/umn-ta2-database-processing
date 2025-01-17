@@ -1,4 +1,5 @@
 attribute_label,corresponding_attribute_label,file_name
+uri,"https://mrdata.usgs.gov/mrds",
 record_id,dep_id,
 name,name,Names
 aliases,,
@@ -14,5 +15,17 @@ deposit_type,dep_tp,Deposits
 grade,grd,Resource_detail
 grade_unit,grd_units,Resource_detail
 tonnage,,
+mineral_form,ore,trimmed
+mineral_form,gangue,trimmed
+mineral_form,other_matl,trimmed
+alteration,alteration,trimmed
+concentration_process,conc_proc,trimmed
+ore_control,ore_ctrl_text,Ore_control
+host_rock_unit,hrock_unit,trimmed
+host_rock_type,hrock_type,trimmed
+associated_rock_unit,arock_unit,trimmed
+associated_rock_type,arock_type,trimmed
+structure,structure,trimmed
+tectonic,tectonic,trimmed
+discovered_year,disc_yr,trimmed
 site_type,dev_st,Deposits
-uri,"https://mrdata.usgs.gov/mrds",
