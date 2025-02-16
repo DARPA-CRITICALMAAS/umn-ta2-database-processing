@@ -4,9 +4,10 @@ import pickle # Delete later
 from datetime import datetime, timezone
 import decimal
 
-from ._entity import *
+# from ._entity import *
 from ._crs import *
 from ._datatype import *
+from ._schema import *
 
 def add_attribute(pl_data: pl.DataFrame, 
                   attribute:str = None, value = None,
@@ -52,7 +53,7 @@ def label2label(pl_data: pl.DataFrame,
     # Identify attributes that exist in database and mapping file
     set_actual_cols = set(list(pl_data.columns))
     set_attrs_cols = set(pl_label_map['corresponding_attribute_label'].to_list())
-    list_existing_cols = list(set_attrs_cols.intersection(set_actual_cols))
+    list_existing_cols = list(set_attrs_cols & (set_actual_cols | {'category'}))    # TODO: check if category is being included
     del set_actual_cols, set_attrs_cols
 
     # Create dictionary for literals (i.e., those that do not exist in the data)
@@ -90,18 +91,20 @@ def label2label(pl_data: pl.DataFrame,
 
     return pl_data, dict_literals
 
-def data2schema(pl_input: pl.DataFrame,
-                dict_all_entities: Dict[str, Dict[str, str]],) -> pl.DataFrame:
+# def data2schema(pl_input: pl.DataFrame,
+#                 dict_all_entities: Dict[str, Dict[str, str]],) -> pl.DataFrame:
+def new_data2schema(pl_input: pl.DataFrame,
+                    dict_all_entities: Dict[str, Dict[str, str]],) -> pl.DataFrame:
     """
-    TODO: fill up information
     Maps value to minmod format
 
     Argument
-    : pl_input: 
-    : list_attribute: 
+    : pl_input:
+    : dict_all_entities: 
 
     Return
     """
+    # Define default entity (i.e., null entity)
     default_entity = {
         "confidence": 0.00,
         "normalized_uri": None,
@@ -109,137 +112,45 @@ def data2schema(pl_input: pl.DataFrame,
         "source": None,
     }
 
-    set_actual_cols = set(list(pl_input.columns))
+    # list to store all the dataframe output from each schema
+    list_pl_outputs = []
 
-    list_general = list({'record_id', 'source_id', 'name', 'aliases', 'modified_at', 'created_by', 'site_type', 'reference', 'location', 'mineral_form', 'alteration', 'concentration_process', 'ore_control', 'host_rock_unit', 'host_rock_type', 'associated_rock_unit', 'associated_rock_type', 'structure', 'tectonic', 'discovered_year'} & set_actual_cols)
-    pl_output = pl_input.select(pl.col(list_general)).group_by('record_id').agg([pl.all()]).with_columns(
-        pl.col('name').list.unique().list.eval(pl.element().filter(pl.element() != "")),
-        pl.exclude(['record_id', 'name']).list.first(),
-    ).with_columns(
-        pl.col('name').list.first(),
-        name_additional = pl.col('name').list.slice(1,)
-    )
+    # Create deposit type candidate schema
+    pl_deptype = sch_dep_type_cand(pl_data=pl_input,
+                                   dict_all_entities=dict_all_entities, default_entity=default_entity)
+    if pl_deptype.is_empty(): pass
+    else: list_pl_outputs.append(pl_deptype)
+    print('deptype', pl_deptype.shape[0])
 
-    # Map host rock and associated rock
-    pl_output = pl_output.rename({'host_rock_type': 'type', 'host_rock_unit': 'unit'}).with_columns(
-        host_rock = pl.struct(pl.col(['type', 'unit']))
-    ).drop(['type', 'unit']).rename({'associated_rock_type': 'type', 'associated_rock_unit': 'unit'}).with_columns(
-        associated_rock = pl.struct(pl.col(['type', 'unit']))
-    ).drop(['type', 'unit']).with_columns(
-        pl.col('discovered_year').cast(pl.Int64, strict=False),
-        pl.col('mineral_form').str.replace_all(r"\s*[\|,;]\s*", ";").str.split(';')
-    )
+    # # Create location information schema
+    pl_locinfo = sch_location_info(pl_data=pl_input,
+                                   dict_all_entities=dict_all_entities, default_entity=default_entity)
+    if pl_locinfo.is_empty(): pass
+    else: list_pl_outputs.append(pl_locinfo)
+    print('locinfo', pl_locinfo.shape[0])
 
-    # Add to aliases
-    try:
-        pl_output = pl_output.rename({"name_additional": 'aliases'})
-    except pl.DuplicateError:
-        pl_output = pl_output.with_columns(
-            pl.concat_list('aliases', 'name_additional')
-        ).drop('name_additional')
+    # Create geology info schema
+    pl_geoinfo = sch_geology_info(pl_data=pl_input)
+    if pl_geoinfo.is_empty(): pass
+    else: list_pl_outputs.append(pl_geoinfo)
+    print('geoinfo', pl_geoinfo.shape[0])
 
-    # Criterias to map
-    list_map = list({'country', 'state_or_province', 'epsg', 'deposit_type'} & set_actual_cols)
-    pl_map = pl_input.select(
-        pl.col('record_id'),
-        pl.col(list_map)
-    ).unique(subset=['record_id'], keep='first')
+    print(pl_input.shape[0])
 
-    for mi in list_map:
-        pl_tmp = pl_map.select(pl.col(['record_id', mi]))
-        bool_type_list = False
-        if pl_tmp[mi].dtype == pl.List:
-            pl_tmp = pl_tmp.with_columns(pl.col(mi).list.unique()).explode(mi)
-            bool_type_list = True
+    # Create mineral inventory schema
+    pl_mineralinventory = sch_mineral_inventory(pl_data=pl_input,
+                                                dict_all_entities=dict_all_entities, default_entity=default_entity)
+    if pl_mineralinventory.is_empty(): pass
+    else: list_pl_outputs.append(pl_mineralinventory)
 
-        unique_items = pl_tmp.unique(subset=[mi])[mi].to_list()
-        tmp_mapping_dict = {}
-
-        for i in unique_items:
-            tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities[mi])
-            
-        pl_tmp = pl_tmp.rename({mi: 'tmp'}).with_columns(
-            pl.col('tmp').replace(tmp_mapping_dict, default=default_entity).alias(mi)
-        ).drop('tmp')
-
-        if bool_type_list:
-            pl_tmp = pl_tmp.group_by('record_id').agg([pl.all()])
-
-        pl_output = pl_output.join(pl_tmp, on='record_id')
-
-    # Replace column name epsg to crs
-    try: pl_output = pl_output.rename({'epsg': 'crs'})
-    except: pass
-
-    try: pl_output = pl_output.rename({'deposit_type': 'deposit_type_candidate'})
-    except: pass
-
-    # Convert to schema
-    set_output_cols = set(list(pl_output.columns))
-    list_others = list({'source_id', 'record_id', 'name', 'aliases' , 'modified_at', 'created_by', 'site_type', 'deposit_type_candidate', 'mineral_form'} & set_output_cols)
-    list_loc_info = list({'location', 'country', 'state_or_province', 'crs'} & set_output_cols)
-
-    pl_output = pl_output.select(
-        pl.col(list_others),
-        location_info = pl.struct(pl.col(list_loc_info)),
-        geology_info = pl.struct(pl.col(['concentration_process', 'ore_control', 'host_rock', 'associated_rock', 'structure', 'tectonic'])),
-        reference = pl.col('reference').map_elements(lambda x: [x])
-    ).group_by('record_id').agg([pl.all()]).with_columns(
-        pl.exclude('record_id').list.first()
-    )
-
-    # Create mineral_iventories
-    list_commodity = list({'commodity', 'grade', 'unit', 'tonnage', 'reference'} & set_actual_cols)
-    pl_commod = pl_input.select(
-        pl.col('record_id'),
-        pl.col(list_commodity)
-    ).unique(subset=list_commodity, maintain_order=True)
-
-    list_cmap = list({'commodity', 'unit'} & set_actual_cols)
-    for ci in list_cmap:
-        # pl_tmp = pl_commod.select(pl.col([ci]))
-        if pl_commod[ci].dtype == pl.List:
-            pl_commod = pl_commod.with_columns(pl.col(ci).list.unique()).explode(ci)
-
-        unique_items = pl_commod.unique(subset=[ci])[ci].to_list()
-        tmp_mapping_dict = {}
-
-        for i in unique_items:
-            tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities[ci])
-            
-        pl_commod = pl_commod.with_columns(
-            pl.col(ci).replace(tmp_mapping_dict, default=default_entity)
-        )
-
-    if 'commodity' in list(pl_commod.columns):
-        pl_commod = pl_commod.filter(
-            pl.col('commodity').struct.field('confidence') > 0
-        )
-
-    # Rename tonnage, grade, and grade unit to that in schema
-    if 'tonnage' in list(pl_commod.columns):
-        pl_commod = pl_commod.rename({'tonnage': 'contained_metal'}).with_columns(pl.col('contained_metal').cast(pl.Float64, strict=False))
-    if 'grade' in list(pl_commod.columns):
-        pl_commod = pl_commod.rename({'grade': 'value'}).with_columns(pl.col('value').cast(pl.Float64, strict=False))
-    if 'grade_unit' in list(pl_commod.columns):
-        pl_commod = pl_commod.rename({'grade_unit': 'unit'})
-
-    list_grade = list({'value', 'unit'} & set(list(pl_commod.columns)))
-    if len(list_grade) != 0:
-        pl_commod = pl_commod.with_columns(
-            grade = pl.struct(pl.col(list_grade))
-        ).drop(list_grade)
-    
-    list_min_inven = list({'commodity', 'grade', 'contained_metal', 'reference'} & set(list(pl_commod.columns)))
-    pl_commod = pl_commod.select(
-        pl.col('record_id'),
-        mineral_inventory = pl.struct(pl.col(list_min_inven))
-    ).group_by('record_id').agg([pl.all()])
+    # Wrap to mineral site schema
+    pl_mineralsite = sch_mineral_site(pl_data=pl_input)
+    list_pl_outputs.append(pl_mineralsite)
+    print('mineralsite', pl_mineralsite.shape[0])
 
     pl_output = pl.concat(
-        [pl_output, pl_commod],
+        list_pl_outputs,
         how='align'
     )
 
     return pl_output
-

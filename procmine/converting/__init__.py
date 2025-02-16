@@ -1,5 +1,5 @@
 from ._crs import crs2crs
-from ._entity import *
+# from ._entity import *
 from ._attribute import *
 
 __all__ = [

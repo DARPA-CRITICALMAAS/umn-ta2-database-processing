@@ -12,9 +12,14 @@ crs,NAD27,
 country,country,Location
 state_or_province,state_prov,Location
 deposit_type,dep_tp,Deposits
-grade,grd,Resource_detail
+grade_value,grd,Resource_detail
 grade_unit,grd_units,Resource_detail
-tonnage,,
+grade_year,yr,Resource_detail
+tonnage_value,meas,Resources
+tonnage_value,indic,Resources
+tonnage_value,infer,Resources
+tonnage_unit,units,Resources
+tonnage_year,yr,Resources
 mineral_form,ore,trimmed
 mineral_form,gangue,trimmed
 mineral_form,other_matl,trimmed

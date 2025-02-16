@@ -95,16 +95,22 @@ class ProcMine:
                              "Please move the '_selected_cols.pkl' file to the appropriate folder")
 
     def process(self):
+        potential_category = []
+        if (self.map.filter(pl.col('attribute_label') == 'category').shape[0] == 0):
+            try:
+                potential_category = self.map.filter(pl.col('attribute_label') == 'tonnage_value')['corresponding_attribute_label'].to_list()
+            except: pass
+
         commods = []
         alias_commod = ''
         if self.map.filter(pl.col('attribute_label') == 'commodity').shape[0] > 1:
             # Cleaning step for case where there is commodity associated with grade/tonnage and commodity not-associated without
-            if ('grade' in self.map['attribute_label'].to_list()) or ('tonnage' in self.map['attribute_label'].to_list()):
+            if ('grade_value' in self.map['attribute_label'].to_list()) or ('tonnage_value' in self.map['attribute_label'].to_list()):
                 try:
-                    grade_file = self.map.filter(pl.col('attribute_label') == 'grade')['file_name'].to_list()
+                    grade_file = self.map.filter(pl.col('attribute_label') == 'grade_value')['file_name'].to_list()
                 except: pass
                 try:
-                    tonnage_file = self.map.filter(pl.col('attribute_label') == 'tonnage')['file_name'].to_list()
+                    tonnage_file = self.map.filter(pl.col('attribute_label') == 'tonnage_value')['file_name'].to_list()
                 except: pass
 
                 commodity_files = self.map.filter(pl.col('attribute_label') == 'commodity')['file_name'].to_list()
@@ -116,6 +122,43 @@ class ProcMine:
 
                 commods = commod_items.filter(pl.col('file_name').is_in(commod_files))['tmp'].to_list()
                 alias_commod = commod_items.filter(pl.col('file_name').is_in(other_files))['tmp'].to_list()[0]
+
+        grade_col = ''
+        tonnage_col = ''
+        tonnage_file = ''
+        # Create grade year and tonnage year columns
+        if (self.map.filter(pl.col('attribute_label') == 'tonnage_year').shape[0] > 0) or (self.map.filter(pl.col('attribute_label') == 'grade_year').shape[0] > 0):
+            grade_file = ''
+            grade_year = ''
+            try:
+                grade_file = self.map.filter(pl.col('attribute_label') == 'grade_value')['file_name'].to_list()[0]   # If fail at this point, no need to look further
+                map_grade = self.map.filter(pl.col('attribute_label') == 'grade_year')
+                grade_year = map_grade['corresponding_attribute_label'].to_list()[0]
+
+            except: pass
+
+            tonnage_file = ''
+            tonnage_year = ''
+            try:
+                tonnage_file = self.map.filter(pl.col('attribute_label') == 'tonnage_value')['file_name'].to_list()[0] # If fail at this point, no need to look further
+                map_tonnage = self.map.filter(pl.col('attribute_label') == 'tonnage_year')
+                tonnage_year = map_tonnage['corresponding_attribute_label'].to_list()[0]
+            except: pass
+
+            if grade_file == '' and tonnage_file == '':     # Without grade and tonnage information, just pass
+                pass     
+            elif grade_year != '' and tonnage_year != '':   # Both cases available
+                grade_col = grade_file + ';' + grade_year
+                tonnage_col = tonnage_file + ';' + tonnage_year
+            elif grade_year != '':                          # Assume tonnage year is same as grade year
+                grade_col = grade_file + ';' + grade_year
+                tonnage_col = tonnage_file + ';' + grade_year
+            elif tonnage_year != '':                        # Assume grade year is same as tonnage year
+                grade_col = grade_file + ';' + tonnage_year
+                tonnage_col = tonnage_file + ';' + tonnage_year
+
+            grade_col = grade_col.lower()
+            tonnage_col = tonnage_col.lower()
 
         # Combine filename to corresponding attribute label
         self.map = self.map.with_columns(
@@ -143,6 +186,26 @@ class ProcMine:
 
             self.map = self.map.filter(~pl.col('corresponding_attribute_label').is_in(commods))
 
+        # If both year columns are available
+        if (grade_col in list(self.data.columns)) and (tonnage_col in list(self.data.columns)): 
+            self.data = self.data.filter((pl.col(grade_col) == pl.col(tonnage_col)) | (pl.col(grade_col).is_null()) | (pl.col(tonnage_col).is_null()))
+
+        # Identify which category columns are available, and create a category column
+        self.data = self.data.with_columns(category = pl.lit(''))
+        for pc in potential_category:
+            self.data = self.data.with_columns(
+                pl.when(pl.col(f'{tonnage_file.lower()};{pc}').is_not_null()).then(
+                    pl.lit([pc])
+                ).otherwise(
+                    pl.lit([])
+                ).alias(f'{pc}_true')
+            )
+
+        potential_category = [f'{i}_true' for i in potential_category]
+        self.data = self.data.with_columns(
+            pl.concat_list(potential_category).alias('category')
+        ).drop(potential_category)
+
         # Map labels based on mapping dictionary
         self.data, dict_literals = converting.label2label(pl_data=self.data, pl_label_map=self.map)
 
@@ -151,16 +214,21 @@ class ProcMine:
         dict_literals['reference'] = {"document": {"uri": dict_literals['uri']}}
         dict_literals['created_by'] = "https://minmod.isi.edu/users/s/umn"
         dict_literals['modified_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
         del dict_literals['uri']
         self.data = converting.add_attribute(self.data, dict_attributes=dict_literals)
 
         # If both commodities and deposit types available, combine commodities and deposit type information
         if len({'commodity', 'deposit_type'} & set(list(self.data.columns))) == 2:
             self.data = self.data.with_columns(
-                pl.concat_str(
-                    [pl.col('deposit_type', 'commodity')],
-                    separator=' '
-                ).alias('deposit_type')
+                pl.when(
+                    (pl.col('deposit_type') != ''), 
+                    (pl.col('deposit_type') != ' ')).then(
+                        pl.concat_str(
+                            [pl.col('deposit_type', 'commodity')],
+                            separator=' '
+                        )
+                    ).otherwise(pl.col('deposit_type')).alias('deposit_type')
             )
 
         # Load_entity as dataframe
@@ -212,7 +280,7 @@ class ProcMine:
         )
 
         # Pop necessary columns
-        col_to_pop = set(list(self.data.columns)) & {'aliases', 'state_or_province', 'country', 'commodity', 'deposit_type'}
+        col_to_pop = set(list(self.data.columns)) & {'name', 'aliases', 'state_or_province', 'country', 'commodity', 'deposit_type'}
         self.data = self.data.with_columns(
             pl.col(col_to_pop).str.replace_all(r"\s*[\|,;]\s*", ";").str.split(';')
         )
@@ -220,11 +288,13 @@ class ProcMine:
         # Rename crs column to epsg (for conversion purpose)
         if 'crs' in list(self.data.columns):
             self.data = self.data.rename({'crs': 'epsg'})
-        if 'grade_unit' in list(self.data.columns):
-            self.data = self.data.rename({'grade_unit': 'unit'})
+
+        print(self.data.shape[0])
 
         # Convert to schema format
-        self.data = converting.data2schema(pl_input=self.data, dict_all_entities=self.entities)
+        self.data = converting.new_data2schema(pl_input=self.data, dict_all_entities=self.entities)
+
+        print(self.data.shape[0])
 
     def save_output(self,
                     save_format: str='json') -> None:

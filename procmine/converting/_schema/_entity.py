@@ -1,9 +1,61 @@
 from typing import Dict, List
+import polars as pl
 
 import regex as re
 from strsimpy import normalized_levenshtein, jaro_winkler, metric_lcs, cosine, overlap_coefficient, sorensen_dice
-# import strsim
 import statistics
+
+def entity_mapper(pl_data: pl.DataFrame,
+                  list_map: List[str],
+                  dict_all_entities: Dict[str, Dict[str, str]],
+                  default_entity: dict) -> pl.DataFrame:
+    """
+    TODO: fill in information
+
+    Argument
+    : pl_data: 
+    : list_map: 
+    : dict_all_entities: 
+    : default_entity: 
+
+    Return
+
+    """
+    list_processed_data = []
+
+    for mi in list_map:
+        pl_tmp = pl_data.select(pl.col(['record_id', mi])).unique()
+        bool_type_list = False
+
+        if pl_tmp[mi].dtype == pl.List:
+            pl_tmp = pl_tmp.with_columns(pl.col(mi).list.unique()).explode(mi)
+            bool_type_list = True
+
+        unique_items = pl_tmp.unique(subset=[mi])[mi].to_list()
+        tmp_mapping_dict = {}
+
+        for i in unique_items:
+            try:
+                tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities[mi])
+            except:
+                # Added to deal with different names of the unit (i.e., grade_unit, tonnage_unit)
+                tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities['unit'])
+
+        pl_tmp = pl_tmp.rename({mi: 'tmp'}).with_columns(
+            pl.col('tmp').replace(tmp_mapping_dict, default=default_entity).alias(mi)
+        ).drop('tmp')
+
+        if bool_type_list:
+            pl_tmp = pl_tmp.group_by('record_id').agg([pl.all()])
+
+        list_processed_data.append(pl_tmp)
+
+    pl_output = pl.concat(
+        list_processed_data,
+        how='align'
+    )
+
+    return pl_output
 
 def entity2id(entity_name: str,
               dict_sub_entities:  Dict[str, str],) -> dict:
@@ -29,6 +81,9 @@ def entity2id(entity_name: str,
         return dict_entity
 
     entity_uri, confidence = identify_entity_id(observed_entity_name=entity_name, dict_entities=dict_sub_entities)
+
+    if confidence <= 0.4:
+        return dict_entity
 
     if entity_uri:
         dict_entity = {
