@@ -26,7 +26,7 @@ def sch_mineral_site(pl_data: pl.DataFrame):
     : pl_data: 
     
     """
-    list_mineral_site = list({'name', 'aliases', 'modified_at', 'record_id', 'source_id', 'reference', 'site_rank', 'site_type', 'source_id', 'mineral_form', 'discovered_year'} & set(list(pl_data.columns)))
+    list_mineral_site = list({'name', 'aliases', 'modified_at', 'created_by',  'record_id', 'source_id', 'reference', 'site_rank', 'site_type', 'source_id', 'mineral_form', 'discovered_year'} & set(list(pl_data.columns)))
     pl_mineralsite = pl_data.select(
         pl.col(list_mineral_site)
     ).unique()
@@ -58,7 +58,8 @@ def sch_mineral_site(pl_data: pl.DataFrame):
     pl_mineralsite = pl_mineralsite.group_by('record_id').agg([pl.all()]).with_columns(
         pl.exclude(['record_id', 'aliases']).list.first()
     ).with_columns(
-        pl.col('mineral_form').str.replace_all(r"\s*[\|,;]\s*", ";").str.split(';').list.eval(pl.element().filter(pl.element() != ""))
+        pl.col('mineral_form').str.replace_all(r"\s*[\|,;]\s*", ";").str.split(';').list.eval(pl.element().filter(pl.element() != "")),
+        pl.col('reference').map_elements(lambda x: [x])
     )
 
     return pl_mineralsite

@@ -5,6 +5,9 @@ name,name,Names
 aliases,,
 commodity,commod,Resource_detail
 commodity,commod,Commodity
+commodity,commod1,trimmed
+commodity,commod2,trimmed
+commodity,commod3,trimmed
 latitude,lat_dec,Coords
 longitude,lon_dec,Coords
 location,,

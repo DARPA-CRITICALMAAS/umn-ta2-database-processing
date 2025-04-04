@@ -53,7 +53,8 @@ def label2label(pl_data: pl.DataFrame,
     # Identify attributes that exist in database and mapping file
     set_actual_cols = set(list(pl_data.columns))
     set_attrs_cols = set(pl_label_map['corresponding_attribute_label'].to_list())
-    list_existing_cols = list(set_attrs_cols & (set_actual_cols | {'category'}))    # TODO: check if category is being included
+    list_existing_cols = list((set_attrs_cols | {'category'}) & set_actual_cols)    # TODO: check if category is being included
+
     del set_actual_cols, set_attrs_cols
 
     # Create dictionary for literals (i.e., those that do not exist in the data)
@@ -72,8 +73,13 @@ def label2label(pl_data: pl.DataFrame,
 
     # Fill null with blank space to prevent any string concatenation error
     pl_data = pl_data.select(
-        pl.col(list_existing_cols).fill_null("").str.to_titlecase()
+        pl.col(list_existing_cols)
     )
+
+    try:
+        list_existing_cols.remove('category')
+    except: pass
+    pl_data = pl_data.with_columns(pl.col(list_existing_cols).fill_null("").str.to_titlecase())
 
     for attribute, value in dict_existing.items():
         try:
@@ -91,10 +97,8 @@ def label2label(pl_data: pl.DataFrame,
 
     return pl_data, dict_literals
 
-# def data2schema(pl_input: pl.DataFrame,
-#                 dict_all_entities: Dict[str, Dict[str, str]],) -> pl.DataFrame:
-def new_data2schema(pl_input: pl.DataFrame,
-                    dict_all_entities: Dict[str, Dict[str, str]],) -> pl.DataFrame:
+def data2schema(pl_input: pl.DataFrame,
+                dict_all_entities: Dict[str, Dict[str, str]],) -> pl.DataFrame:
     """
     Maps value to minmod format
 
@@ -122,7 +126,7 @@ def new_data2schema(pl_input: pl.DataFrame,
     else: list_pl_outputs.append(pl_deptype)
     print('deptype', pl_deptype.shape[0])
 
-    # # Create location information schema
+    # Create location information schema
     pl_locinfo = sch_location_info(pl_data=pl_input,
                                    dict_all_entities=dict_all_entities, default_entity=default_entity)
     if pl_locinfo.is_empty(): pass
@@ -135,13 +139,12 @@ def new_data2schema(pl_input: pl.DataFrame,
     else: list_pl_outputs.append(pl_geoinfo)
     print('geoinfo', pl_geoinfo.shape[0])
 
-    print(pl_input.shape[0])
-
     # Create mineral inventory schema
     pl_mineralinventory = sch_mineral_inventory(pl_data=pl_input,
                                                 dict_all_entities=dict_all_entities, default_entity=default_entity)
     if pl_mineralinventory.is_empty(): pass
     else: list_pl_outputs.append(pl_mineralinventory)
+    print('mineralinventory', pl_mineralinventory.shape[0])
 
     # Wrap to mineral site schema
     pl_mineralsite = sch_mineral_site(pl_data=pl_input)

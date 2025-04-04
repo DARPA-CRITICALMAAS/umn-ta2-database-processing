@@ -114,7 +114,7 @@ class ProcMine:
                 except: pass
 
                 commodity_files = self.map.filter(pl.col('attribute_label') == 'commodity')['file_name'].to_list()
-                commod_files = list(set(commodity_files) - set(grade_file) - set(tonnage_file))
+                commod_files = list(set(commodity_files) - (set(grade_file) | set(tonnage_file)))
                 other_files = list(set(grade_file)|set(tonnage_file))
 
                 commod_items = self.map.filter(pl.col('attribute_label') == 'commodity').with_columns(
@@ -173,6 +173,10 @@ class ProcMine:
         if len(commods) > 0:
             rec_id = self.map.filter(pl.col('attribute_label') == 'record_id').item(0, 'corresponding_attribute_label')
 
+            self.data = self.data.with_columns(
+                pl.col(commods).fill_null("")
+            )
+            
             pl_tmp = self.data.select(
                 pl.col(rec_id),
                 pl.concat_str(commods, separator="; ").alias(alias_commod),
@@ -188,7 +192,9 @@ class ProcMine:
 
         # If both year columns are available
         if (grade_col in list(self.data.columns)) and (tonnage_col in list(self.data.columns)): 
-            self.data = self.data.filter((pl.col(grade_col) == pl.col(tonnage_col)) | (pl.col(grade_col).is_null()) | (pl.col(tonnage_col).is_null()))
+            self.data = self.data.filter(
+                (pl.col(grade_col) == pl.col(tonnage_col)) | (pl.col(grade_col).is_null()) | (pl.col(tonnage_col).is_null())
+            )
 
         # Identify which category columns are available, and create a category column
         self.data = self.data.with_columns(category = pl.lit(''))
@@ -289,12 +295,8 @@ class ProcMine:
         if 'crs' in list(self.data.columns):
             self.data = self.data.rename({'crs': 'epsg'})
 
-        print(self.data.shape[0])
-
         # Convert to schema format
-        self.data = converting.new_data2schema(pl_input=self.data, dict_all_entities=self.entities)
-
-        print(self.data.shape[0])
+        self.data = converting.data2schema(pl_input=self.data, dict_all_entities=self.entities)
 
     def save_output(self,
                     save_format: str='json') -> None:

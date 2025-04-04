@@ -33,18 +33,21 @@ def sch_mineral_inventory(pl_data: pl.DataFrame,
     
     """
     list_mineral_inventory = list({'commodity', 'grade_value', 'grade_unit', 'tonnage_value', 'tonnage_unit', 'tonnage_year', 'grade_year', 'reference', 'category'} & set(list(pl_data.columns)))
-    list_unique = list({'commodity', 'grade_value', 'grade_unit', 'tonnage_value', 'tonnage_unit', 'tonnage_year', 'grade_year'} & set(list_mineral_inventory))
+    list_unique = list({'record_id', 'commodity', 'grade_value', 'grade_unit', 'tonnage_value', 'tonnage_unit', 'tonnage_year', 'grade_year'} & set(list(pl_data.columns)))
     pl_min_inven = pl_data.select(
         pl.col('record_id'),
         pl.col(list_mineral_inventory)
-    ).explode('commodity').unique(subset=list_unique)
+    ).explode('commodity').filter(pl.col('commodity') != '').with_columns(
+        tmp = pl.struct(list_unique)
+    ).unique('tmp').drop('tmp')
+
+    print(dict_all_entities['category'])
 
     year_col = list({'tonnage_year', 'grade_year'} & set(list(pl_min_inven.columns)))[0]
     pl_min_inven = pl_min_inven.rename({year_col:'resource_year'})
 
     # Map commodity, grade unit, ore unit
     list_map = list(set(list_mineral_inventory) & {'commodity', 'grade_unit', 'tonnage_unit', 'category'})
-    print(list_map)
     pl_mapped_min_inven = entity_mapper(pl_data=pl_min_inven, list_map=list_map,
                                         dict_all_entities=dict_all_entities, default_entity=default_entity)
 
@@ -52,7 +55,7 @@ def sch_mineral_inventory(pl_data: pl.DataFrame,
     pl_min_inven = pl.concat(
         [pl_min_inven, pl_mapped_min_inven],
         how='align'
-    ).unique()
+    )
 
     # Grade
     pl_min_inven = sch_unit_value(pl_data=pl_min_inven,
@@ -82,7 +85,15 @@ def sch_mineral_inventory(pl_data: pl.DataFrame,
         ).drop('resource_year')
     except: pass
 
+    pl_min_inven = pl_min_inven.unique()
+
     list_mineral_inventory = list({'commodity', 'grade', 'ore', 'resource_year', 'reference', 'category'} & set(list(pl_min_inven.columns)))
+
+    if 'category' in list_mineral_inventory:
+        pl_min_inven = pl_min_inven.with_columns(
+            pl.col('category').list.unique()
+        )
+
     pl_min_inven = pl_min_inven.select(
         pl.col('record_id'),
         mineral_inventory = pl.struct(pl.col(list_mineral_inventory))

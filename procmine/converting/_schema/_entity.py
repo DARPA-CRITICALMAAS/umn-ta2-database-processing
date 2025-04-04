@@ -1,5 +1,6 @@
 from typing import Dict, List
 import polars as pl
+import pandas as pd
 
 import regex as re
 from strsimpy import normalized_levenshtein, jaro_winkler, metric_lcs, cosine, overlap_coefficient, sorensen_dice
@@ -29,6 +30,9 @@ def entity_mapper(pl_data: pl.DataFrame,
 
         if pl_tmp[mi].dtype == pl.List:
             pl_tmp = pl_tmp.with_columns(pl.col(mi).list.unique()).explode(mi)
+
+            if pl_tmp[mi].dtype == pl.List:
+                pl_tmp = pl_tmp.with_columns(pl.col(mi).list.first())
             bool_type_list = True
 
         unique_items = pl_tmp.unique(subset=[mi])[mi].to_list()
@@ -77,7 +81,7 @@ def entity2id(entity_name: str,
         "source": ""
     }
 
-    if entity_name == " " or entity_name == "":
+    if entity_name == " " or entity_name == "" or not entity_name:
         return dict_entity
 
     entity_uri, confidence = identify_entity_id(observed_entity_name=entity_name, dict_entities=dict_sub_entities)

@@ -76,6 +76,8 @@ def compile_entities(dir_entities: str, dict_entities_col: Dict[str, List[str]])
         entity_type = data.return_basename(filename)
 
         if 'minmod_id' not in list(pl_data.columns):
+            if entity_type == 'category':
+                dict_all_entities[entity_type] = converting.non2dict(pl_data=pl_data, val_col='id')
             continue
 
         pl_data = pl_data.select(
