@@ -37,5 +37,7 @@ def sch_dep_type_cand(pl_data: pl.DataFrame,
     try: pl_deptype = pl_deptype.rename({'deposit_type': 'deposit_type_candidate'})
     except: pass
 
+    pl_deptype = pl_deptype.with_columns(pl.col('deposit_type_candidate').list.first())
+
     return pl_deptype
     

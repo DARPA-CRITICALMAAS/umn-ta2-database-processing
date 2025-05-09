@@ -35,7 +35,7 @@ def load_data(path_file:str, mode_data:str,
     Returns all data in form of pl DataFrame
     """
     if mode_data == '.csv':
-        return pl.read_csv(path_file, encoding='utf8-lossy', ignore_errors=True)
+        return pl.read_csv(path_file, encoding='utf8-lossy', truncate_ragged_lines=True, ignore_errors=True)
     
     if mode_data == '.tsv' or mode_data == '.txt':
         return pl.read_csv(path_file, separator='\t', encoding='utf8-lossy', ignore_errors=True)

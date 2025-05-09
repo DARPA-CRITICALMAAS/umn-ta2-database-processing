@@ -50,16 +50,27 @@ def sch_mineral_site(pl_data: pl.DataFrame):
         ).drop('name_additional')
 
     # Discovered year, mineral form
-    pl_mineralsite = pl_mineralsite.with_columns(
-        pl.col('discovered_year').cast(pl.Int64, strict=False),
-    )
+    try:
+        pl_mineralsite = pl_mineralsite.with_columns(
+            pl.col('discovered_year').cast(pl.Int64, strict=False),
+        )
+    except: pass
 
     # Groupby record_id, for non-list, get first item in list
     pl_mineralsite = pl_mineralsite.group_by('record_id').agg([pl.all()]).with_columns(
-        pl.exclude(['record_id', 'aliases']).list.first()
-    ).with_columns(
-        pl.col('mineral_form').str.replace_all(r"\s*[\|,;]\s*", ";").str.split(';').list.eval(pl.element().filter(pl.element() != "")),
-        pl.col('reference').map_elements(lambda x: [x])
+        pl.exclude(['record_id']).list.first()
     )
+    
+    try: 
+        pl_mineralsite = pl_mineralsite.with_columns(
+            pl.col('reference').map_elements(lambda x: [x])
+        )
+    except: pass
+
+    try:
+        pl_mineralsite = pl_mineralsite.with_columns(
+            pl.col('mineral_form').str.replace_all(r"\s*[\|,;]\s*", ";").str.split(';').list.eval(pl.element().filter(pl.element() != ""))
+        )
+    except: pass
 
     return pl_mineralsite

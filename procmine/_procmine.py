@@ -198,25 +198,28 @@ class ProcMine:
 
         # Identify which category columns are available, and create a category column
         self.data = self.data.with_columns(category = pl.lit(''))
-        for pc in potential_category:
-            self.data = self.data.with_columns(
-                pl.when(pl.col(f'{tonnage_file.lower()};{pc}').is_not_null()).then(
-                    pl.lit([pc])
-                ).otherwise(
-                    pl.lit([])
-                ).alias(f'{pc}_true')
-            )
+        try:
+            for pc in potential_category:
+                self.data = self.data.with_columns(
+                    pl.when(pl.col(f'{tonnage_file.lower()};{pc}').is_not_null()).then(
+                        pl.lit([pc])
+                    ).otherwise(
+                        pl.lit([])
+                    ).alias(f'{pc}_true')
+                )
 
-        potential_category = [f'{i}_true' for i in potential_category]
-        self.data = self.data.with_columns(
-            pl.concat_list(potential_category).alias('category')
-        ).drop(potential_category)
+            potential_category = [f'{i}_true' for i in potential_category]
+            self.data = self.data.with_columns(
+                pl.concat_list(potential_category).alias('category')
+            ).drop(potential_category)
+        except:
+            self.data = self.data.drop('category')
 
         # Map labels based on mapping dictionary
         self.data, dict_literals = converting.label2label(pl_data=self.data, pl_label_map=self.map)
 
         # Append additional literals and add literals to the original data
-        dict_literals['source_id'] = f"database::{dict_literals['uri']}"
+        dict_literals['source_id'] = f"{dict_literals['uri']}"
         dict_literals['reference'] = {"document": {"uri": dict_literals['uri']}}
         dict_literals['created_by'] = "https://minmod.isi.edu/users/s/umn"
         dict_literals['modified_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')

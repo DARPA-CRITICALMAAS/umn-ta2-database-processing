@@ -43,8 +43,10 @@ def sch_mineral_inventory(pl_data: pl.DataFrame,
 
     print(dict_all_entities['category'])
 
-    year_col = list({'tonnage_year', 'grade_year'} & set(list(pl_min_inven.columns)))[0]
-    pl_min_inven = pl_min_inven.rename({year_col:'resource_year'})
+    try:
+        year_col = list({'tonnage_year', 'grade_year'} & set(list(pl_min_inven.columns)))[0]
+        pl_min_inven = pl_min_inven.rename({year_col:'resource_year'})
+    except: pass
 
     # Map commodity, grade unit, ore unit
     list_map = list(set(list_mineral_inventory) & {'commodity', 'grade_unit', 'tonnage_unit', 'category'})
@@ -58,8 +60,10 @@ def sch_mineral_inventory(pl_data: pl.DataFrame,
     )
 
     # Grade
-    pl_min_inven = sch_unit_value(pl_data=pl_min_inven,
-                                  col_value='grade_value', col_unit='grade_unit', col_alias='grade')
+    try:
+        pl_min_inven = sch_unit_value(pl_data=pl_min_inven,
+                                      col_value='grade_value', col_unit='grade_unit', col_alias='grade')
+    except: pass
     
     # Need to add the tonnage value
     try:
@@ -67,16 +71,16 @@ def sch_mineral_inventory(pl_data: pl.DataFrame,
             pl.col('tonnage_value').str.split('; ').list.eval(pl.element().filter(pl.element() != ""))
         ).with_columns(
             pl.struct(pl.col('tonnage_value')).map_elements(lambda x: [float(i) for i in x['tonnage_value']] if x['tonnage_value'] else [0]).list.sum()
+        ).with_columns(
+            pl.col('tonnage_value').replace(0, None)
         )
     except: pass
 
-    pl_min_inven = pl_min_inven.with_columns(
-        pl.col('tonnage_value').replace(0, None)
-    )
-
     # Ore
-    pl_min_inven = sch_unit_value(pl_data=pl_min_inven,
-                                  col_value='tonnage_value', col_unit='tonnage_unit', col_alias='ore')
+    try:
+        pl_min_inven = sch_unit_value(pl_data=pl_min_inven,
+                                    col_value='tonnage_value', col_unit='tonnage_unit', col_alias='ore')
+    except: pass
 
     # Date
     try: 
