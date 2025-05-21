@@ -41,8 +41,6 @@ def sch_mineral_inventory(pl_data: pl.DataFrame,
         tmp = pl.struct(list_unique)
     ).unique('tmp').drop('tmp')
 
-    print(dict_all_entities['category'])
-
     try:
         year_col = list({'tonnage_year', 'grade_year'} & set(list(pl_min_inven.columns)))[0]
         pl_min_inven = pl_min_inven.rename({year_col:'resource_year'})

@@ -1,5 +1,5 @@
 minmod_id,unit name,unit aliases
-Q200,tonnes,t
+Q200,tonnes,t | mt ore
 Q201,percent,% | wt-pct
 Q202,million tonnes,Mt
 Q203,gram per tonne,g/t
