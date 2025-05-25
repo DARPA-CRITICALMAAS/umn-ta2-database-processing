@@ -32,13 +32,19 @@ def sch_mineral_site(pl_data: pl.DataFrame):
     ).unique()
 
     # Name & Alias
+    pl_mineralsite = pl_mineralsite.filter(
+        pl.col('name').list.len() > 0
+    )
+    # pl_mineralsite = pl_mineralsite.with_columns(
+    #     pl.col('name').list.unique().list.eval(pl.element().filter(pl.element() != "")),
+    # )
     
     pl_mineralsite = pl_mineralsite.with_columns(
-        pl.col('name').list.unique().list.eval(pl.element().filter(pl.element() != "")),
-    ).with_columns(
         pl.col('name').list.first(),
         name_additional = pl.col('name').list.slice(1,)
     )
+
+    print(pl_mineralsite.filter(pl.col('record_id') == "10026601")["name", "name_additional"])
 
     try:
         # Rename name addition al column to aliases

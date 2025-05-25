@@ -48,6 +48,7 @@ def sch_mineral_inventory(pl_data: pl.DataFrame,
 
     # Map commodity, grade unit, ore unit
     list_map = list(set(list_mineral_inventory) & {'commodity', 'grade_unit', 'tonnage_unit', 'category'})
+        
     pl_mapped_min_inven = entity_mapper(pl_data=pl_min_inven, list_map=list_map,
                                         dict_all_entities=dict_all_entities, default_entity=default_entity)
 
@@ -59,6 +60,7 @@ def sch_mineral_inventory(pl_data: pl.DataFrame,
 
     # Grade
     try:
+        # grade_is_safe = safe_grade(pl_min_inven)
         pl_min_inven = sch_unit_value(pl_data=pl_min_inven,
                                       col_value='grade_value', col_unit='grade_unit', col_alias='grade')
     except: pass
@@ -76,6 +78,8 @@ def sch_mineral_inventory(pl_data: pl.DataFrame,
 
     # Ore
     try:
+        tonnage_is_safe = safe_tonnage(pl_min_inven)
+        # print("Safe Tonnage, ", tonnage_is_safe)
         pl_min_inven = sch_unit_value(pl_data=pl_min_inven,
                                     col_value='tonnage_value', col_unit='tonnage_unit', col_alias='ore')
     except: pass
@@ -96,7 +100,9 @@ def sch_mineral_inventory(pl_data: pl.DataFrame,
             pl.col('category').list.unique()
         )
 
-    pl_min_inven = pl_min_inven.select(
+    pl_min_inven = pl_min_inven.filter(
+        pl.col("commodity").struct["confidence"] > 0.01
+    ).select(
         pl.col('record_id'),
         mineral_inventory = pl.struct(pl.col(list_mineral_inventory))
     ).group_by('record_id').agg([pl.all()])
@@ -133,3 +139,70 @@ def sch_unit_value(pl_data: pl.DataFrame,
         ).drop(list_val_unit)
 
     return pl_data
+
+def safe_grade(pl_data: pl.DataFrame) -> bool:
+    """
+    Checks whether those with grade unit wt-pct does not go over 100
+
+    Saves incorrect to csv file
+    """
+    pl_data = pl_data.filter(
+        pl.col('grade_value') != ""
+    ).with_columns(
+        pl.col('grade_value').cast(pl.Float64)
+    )
+
+    pl_tmp = pl_data.filter(
+        (pl.col('grade_value') > 100),
+        (pl.col('grade_unit').struct["normalized_uri"] == "https://minmod.isi.edu/resource/Q201")
+    )
+
+    if pl_tmp.shape[0] != 0:
+        print('here')
+        pl_tmp = pl_tmp.select(
+            mrds_link = pl.lit('https://mrdata.usgs.gov/mrds/show-mrds.php?dep_id=') + pl.col('record_id'),
+            error_point = pl.lit('GRADE'),
+            commodity = pl.col('commodity').struct["observed_name"],
+            value = pl.col('grade_value'),
+            unit = pl.col('grade_unit').struct["observed_name"],
+            year = pl.col('grade_year')
+        )
+
+        print('done')
+        
+        pl_tmp.write_csv('/users/2/pyo00005/HOME/CriticalMAAS/invalid_grade.csv')
+        return False
+    
+    pl_tmp = pl_data.filter(
+        ((pl.col('grade_value')/10000) > 100),
+        (pl.col('grade_unit').struct["normalized_uri"] == "https://minmod.isi.edu/resource/Q220")
+    )
+
+    if pl_tmp.shape[0] != 0:
+        print(pl_tmp.select(
+            pl.col('grade_value'),
+            pl.col('grade_unit').struct["normalized_uri"]))
+        return False
+
+    return True
+
+def safe_tonnage(pl_data: pl.DataFrame) -> bool:
+    pl_data = pl_data.filter(
+        (pl.col('tonnage_value') > 1000000000000),
+        (pl.col('tonnage_unit').struct["normalized_uri"] == "https://minmod.isi.edu/resource/Q200")
+    )
+
+    if pl_data.shape[0] == 0:
+        return True
+    else:
+        pl_data = pl_data.select(
+            mrds_link = pl.lit('https://mrdata.usgs.gov/mrds/show-mrds.php?dep_id=') + pl.col('record_id'),
+            error_point = pl.lit('TONNAGE'),
+            commodity = pl.col('commodity').struct["observed_name"],
+            value = pl.col('tonnage_value'),
+            unit = pl.col('tonnage_unit').struct["observed_name"],
+            year = pl.col('tonnage_year')
+        )
+        
+        pl_data.write_csv('/users/2/pyo00005/HOME/CriticalMAAS/invalid_tonnage.csv')
+        return False

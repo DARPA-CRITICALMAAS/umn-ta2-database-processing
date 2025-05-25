@@ -67,5 +67,5 @@ def sch_location_info(pl_data: pl.DataFrame,
     
     return pl_loc_data
 
-def check_location_parsability():
+def safe_location():
     pass

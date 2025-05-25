@@ -88,7 +88,7 @@ def non2dict(pl_data: pl.DataFrame,
 
         for k in key_cols:
             pl_tmp = pl_data.select(pl.col([val_col, k])).drop_nulls(subset=[k]).with_columns(
-                pl.col(k).str.split('|')
+                pl.col(k).str.split(' | ')
             ).explode(k).with_columns(pl.col(k).str.strip_chars())
 
             tmp_dict_data = pl_tmp.rows_by_key(key=k)

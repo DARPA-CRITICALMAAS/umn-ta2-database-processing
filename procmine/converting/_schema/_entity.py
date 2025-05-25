@@ -25,17 +25,20 @@ def entity_mapper(pl_data: pl.DataFrame,
     list_processed_data = []
 
     for mi in list_map:
-        pl_tmp = pl_data.select(pl.col(['record_id', mi])).unique()
-        bool_type_list = False
+        pl_data = pl_data.rename({mi: 'tmp'})
+        pl_subset = pl_data.select(pl.col('tmp')).unique()
 
-        if pl_tmp[mi].dtype == pl.List:
-            pl_tmp = pl_tmp.with_columns(pl.col(mi).list.unique()).explode(mi)
+        bool_mi_list = (pl_subset['tmp'].dtype == pl.List)
 
-            if pl_tmp[mi].dtype == pl.List:
-                pl_tmp = pl_tmp.with_columns(pl.col(mi).list.first())
-            bool_type_list = True
+        if bool_mi_list:
+            pl_tmp = pl_subset.with_columns(pl.col('tmp').list.unique()).explode('tmp')
+            pl_data = pl_data.with_columns(
+                pl.col('tmp').list.join(";")
+            )
+        else:
+            pl_tmp = pl_subset
 
-        unique_items = pl_tmp.unique(subset=[mi])[mi].to_list()
+        unique_items = pl_tmp.unique(subset=['tmp'])['tmp'].to_list()
         tmp_mapping_dict = {}
 
         for i in unique_items:
@@ -45,21 +48,108 @@ def entity_mapper(pl_data: pl.DataFrame,
                 # Added to deal with different names of the unit (i.e., grade_unit, tonnage_unit)
                 tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities['unit'])
 
-        pl_tmp = pl_tmp.rename({mi: 'tmp'}).with_columns(
-            pl.col('tmp').replace(tmp_mapping_dict, default=default_entity).alias(mi)
+        if bool_mi_list:
+            pl_subset = pl_subset.with_columns(
+                pl.when(pl.col('tmp').list.len() == 0)
+                .then(pl.lit([default_entity]))
+                .otherwise(pl.col('tmp').map_elements(lambda x: [tmp_mapping_dict[it] for it in x]))
+                .alias(mi),
+                pl.col('tmp').list.join(";")
+            )
+            # pl_subset = pl_subset.with_columns(
+            #     pl.col('tmp').map_elements(lambda x: [tmp_mapping_dict[it] for it in x]).alias(mi)
+            # )
+        else:
+            pl_subset = pl_subset.with_columns(
+                pl.col('tmp').replace_strict(tmp_mapping_dict, default=default_entity).alias(mi)
+            )
+
+        pl_data = pl.concat(
+            [pl_data, pl_subset],
+            how='align'
         ).drop('tmp')
 
-        if bool_type_list:
-            pl_tmp = pl_tmp.group_by('record_id').agg([pl.all()])
+        # pl_subset = pl_data.select(pl.col(['record_id', mi]))
+        # pl_tmp = pl_subset.unique()
 
-        list_processed_data.append(pl_tmp)
+        # bool_type_list = False
 
-    pl_output = pl.concat(
-        list_processed_data,
-        how='align'
-    )
+        # if pl_tmp[mi].dtype == pl.List:
+        #     pl_tmp = pl_tmp.with_columns(pl.col(mi).list.unique()).explode(mi)
 
-    return pl_output
+        #     if pl_tmp[mi].dtype == pl.List:
+        #         pl_tmp = pl_tmp.with_columns(pl.col(mi).list.first())
+
+        #     bool_type_list = True
+
+        # unique_items = pl_tmp.unique(subset=[mi])[mi].to_list()
+        # tmp_mapping_dict = {}
+
+        # for i in unique_items:
+        #     try:
+        #         tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities[mi])
+        #     except:
+        #         # Added to deal with different names of the unit (i.e., grade_unit, tonnage_unit)
+        #         tmp_mapping_dict[i] = entity2id(i, dict_sub_entities=dict_all_entities['unit'])
+
+        # pl_tmp = pl_tmp.rename({mi: 'tmp'})
+        # # pl_subset = pl_subset.rename({mi: 'tmp'})
+        
+        # # if bool_type_list:
+        # #     pl_subset = pl_subset.with_columns(
+        # #         pl.col('tmp').list.sort()
+        # #     )
+
+        # #     pl_partitioned = pl_subset.partition_by('tmp')
+        # #     pl_subset = pl.DataFrame()
+        # #     # pl_hold = pl.DataFrame()
+
+        # #     list_plps = []
+            
+        # #     for idx, plp in enumerate(pl_partitioned):
+        # #         list_items = plp.item(0, 'tmp') # 0 length or above
+        # #         # print(list_items)
+
+        # #         if len(list_items) == 0:
+        # #             # Empty list
+        # #             list_items = [default_entity]
+        # #         else:
+        # #             list_items = [tmp_mapping_dict[it] for it in list_items]
+
+        # #         plp = plp.drop('tmp').with_columns(
+        # #             pl.lit(list_items).alias(mi)
+        # #         )
+
+        # #         if idx == 0:
+        # #             pl_subset = plp
+        # #         else:
+        # #             pl_subset = pl.concat(
+        # #                 [pl_subset, plp],
+        # #                 how='diagonal_relaxed'
+        # #             )
+
+        # #     # pl_subset = pl.concat(
+        # #     #     list_plps,
+        # #     #     how='diagonal'
+        # #     # )
+        # # else:
+        # pl_tmp = pl_tmp.with_columns(
+        #     pl.col('tmp').replace(tmp_mapping_dict, default=default_entity).alias(mi)
+        # ).drop('tmp')
+
+        # if bool_type_list:
+        #     pl_tmp = pl_tmp.group_by('record_id').agg([pl.all()])
+        # #     pl_subset = pl_subset.group_by('index').agg([pl.all()]).with_columns(
+        # #         pl.col(mi).list.unique(),
+        # #         pl.col('record_id').list.first()
+        # #     ).drop('index')
+        # #     print(pl_subset.filter(pl.col('record_id') == '10071363'))
+
+        # # print(pl_subset.filter(pl.col('record_id') == '10071363'))
+
+        # list_processed_data.append(pl_tmp)
+
+    return pl_data
 
 def entity2id(entity_name: str,
               dict_sub_entities:  Dict[str, str],) -> dict:
